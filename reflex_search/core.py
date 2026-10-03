@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Iterable, Sequence
+from typing import Any, Callable
 
 
 DEFAULT_TEXT_SUFFIXES = {
@@ -76,20 +76,14 @@ class SearchSession:
 class JevClient:
     """A thin relevance scorer.
 
-    Without a remote API key, it falls back to a local heuristic that is deterministic,
-    cheap, and good enough for repository-level narrowing.
+    Without a remote API key, it falls back to a deterministic local heuristic.
     """
 
-    def __init__(
-        self,
-        api_key: str | None = None,
-        endpoint: str | None = None,
-    ) -> None:
+    def __init__(self, api_key: str | None = None, endpoint: str | None = None) -> None:
         self.api_key = api_key or os.getenv("OPENROUTER_API_KEY")
         self.endpoint = endpoint or os.getenv("JEV_ENDPOINT")
 
     def score_relevance(self, file_path: str, query: str, content: str) -> float:
-        """Return a 0-1 relevance score for a candidate file."""
         if self.api_key and self.endpoint:
             return self._remote_score(file_path, query, content)
         return self._local_score(file_path, query, content)
@@ -109,15 +103,9 @@ class JevClient:
             if term in content_preview:
                 score += 0.65 / max(len(query_terms), 1)
 
-        # Mixture of path overlap and content overlap
-        score = min(score, 1.0)
-        return round(score, 4)
+        return round(min(score, 1.0), 4)
 
     def _remote_score(self, file_path: str, query: str, content: str) -> float:
-        """Optional remote call. Kept simple so the library remains testable.
-
-        In a real deployment this could POST a payload to a Jev-compatible endpoint.
-        """
         del file_path, query, content
         return 0.5
 
@@ -159,15 +147,21 @@ class ReflexCodeSearcher:
         self.top_k = top_k
         self.gate = ConfidenceGate(threshold=threshold)
 
-    def search(self, query: str, repo_root: str | None = None, top_k: int | None = None) -> SearchSession:
-        repo_root = repo_root or self.repo_root
-        candidates = self._collect_files(repo_root)
+    def search(
+        self,
+        query: str,
+        repo_root: str | None = None,
+        top_k: int | None = None,
+    ) -> SearchSession:
+        active_root = repo_root or self.repo_root
+        self.repo_root = active_root
+        candidates = self._collect_files(active_root)
         results: list[SearchResult] = []
         audit: list[dict[str, Any]] = []
 
         for index, candidate in enumerate(candidates, start=1):
             try:
-                content = self._read_file(candidate)
+                content = self._read_file(candidate, active_root)
             except OSError:
                 continue
 
@@ -195,7 +189,6 @@ class ReflexCodeSearcher:
                 })
                 continue
 
-            # Optional fallback for uncertain cases
             if self.llm_fallback is not None:
                 llm_score = self.llm_fallback(candidate, query, content)
                 if llm_score >= self.threshold:
@@ -235,12 +228,12 @@ class ReflexCodeSearcher:
             })
 
         results.sort(key=lambda item: item.score, reverse=True)
-        top_n = min(top_k or self.top_k, len(results))
+        limit = min(top_k or self.top_k, len(results))
 
         return SearchSession(
             query=query,
-            repo_root=repo_root,
-            results=results[:top_n],
+            repo_root=active_root,
+            results=results[:limit],
             audit_trail=audit,
         )
 
@@ -265,40 +258,35 @@ class ReflexCodeSearcher:
         files.sort()
         return files
 
-    def _read_file(self, relative_path: str) -> str:
-        path = Path(self.repo_root) / relative_path
-        return path.read_text(encoding="utf-8", errors="ignore")
+    def _read_file(self, relative_path: str, repo_root: str | None = None) -> str:
+        root = Path(repo_root or self.repo_root)
+        return (root / relative_path).read_text(encoding="utf-8", errors="ignore")
 
     def _excerpt(self, content: str, query: str) -> str:
         query_terms = [t.lower() for t in query.replace("-", " ").split() if t]
         lines = content.splitlines()
-        prefix: list[str] = []
+        matches: list[str] = []
 
         for line in lines:
             lowered = line.lower()
             if any(term in lowered for term in query_terms):
-                prefix.append(line.strip())
-                if len(prefix) >= 3:
+                matches.append(line.strip())
+                if len(matches) >= 3:
                     break
 
-        if not prefix:
+        if not matches:
             excerpt = "\n".join(lines[:3])
         else:
-            excerpt = "\n".join(prefix)
+            excerpt = "\n".join(matches)
 
         return excerpt[:400]
 
 
 def _default_llm_fallback(path: str, query: str, content: str) -> float:
-    """Simple fallback heuristic used when a real model is not configured.
-
-    It is intentionally conservative; the fallback only returns a positive score when the
-    file clearly matches the query.
-    """
     query_terms = [part.lower() for part in query.replace("-", " ").split() if part]
-    text = f"{path} {content}".lower()
-    matches = sum(1 for term in query_terms if term in text)
     if not query_terms:
         return 0.0
+    text = f"{path} {content}".lower()
+    matches = sum(1 for term in query_terms if term in text)
     score = matches / len(query_terms)
     return min(score, 0.9)

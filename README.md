@@ -1,24 +1,31 @@
 # reflex-code-search
 
-A clean, focused implementation of semantic code search using a REFLEX-style control loop:
+A small, focused implementation of semantic code search using a REFLEX-style control loop:
 
-- Jev-like relevance checks for fast, bounded file ranking
-- Optional LLM fallback for uncertain cases
-- Small, auditable search sessions with step-by-step reasoning
-- Minimal CLI for local repository discovery
+- fast bounded relevance scoring for file ranking
+- optional LLM fallback for uncertain matches
+- small, auditable search sessions with step-by-step reasoning
+- CLI-first design for local repository discovery
 
-This project is intentionally narrow. It is not a broad coding-agent runtime, IDE, or repository management platform. It is a small, useful primitive: given a natural-language question, find the most likely files to inspect.
+This project is intentionally narrow. It is not a broad coding-agent runtime, IDE, or repo management platform. It is a minimal primitive: given a natural-language question, find the files most likely to be relevant.
 
 ## Why this exists
 
-The original Jevgrep idea is strong: use a fast relevance model to narrow the search space before expensive reasoning. But more elaborate repos often add large amounts of infrastructure, extra search modes, and broad agent behavior that can obscure the core value.
+The core idea behind Jevgrep is valuable: use a fast relevance model to narrow the search space before expensive reasoning. But many implementations end up becoming much larger and more complicated than the core need.
 
-This project keeps the same idea while making the control flow simpler and more explicit:
+This project keeps the same idea while staying smaller and easier to reason about:
 
-1. gather text candidates from a repo
+1. collect candidate files from a repo
 2. score them with a bounded relevance check
 3. escalate uncertain cases to an LLM fallback when configured
-4. return the best files with a compact audit trail
+4. return the best files plus a compact audit trail
+
+## Design goals
+
+- keep the search loop small and explainable
+- keep the control flow explicit: score, gate, fallback if necessary
+- keep outputs auditable, without hiding the decision path
+- avoid mission creep into IDE workflows or orchestration layers
 
 ## Install
 
@@ -45,12 +52,13 @@ reflex-search "Where are migrations defined?" . --json
 ```json
 {
   "query": "How is authentication checked before requests reach the handler?",
+  "repo_root": ".",
   "results": [
     {
       "path": "src/auth/middleware.py",
       "score": 0.95,
       "provider": "jev",
-      "reason": "Strong overlap between query terms and auth enforcement logic"
+      "reason": "Strong relevance score for auth enforcement logic"
     }
   ],
   "audit_trail": [
@@ -64,21 +72,14 @@ reflex-search "Where are migrations defined?" . --json
 }
 ```
 
-## Design goals
-
-- Keep the core search loop small and explainable
-- Use Jev-like checks only when they help reduce search cost
-- Keep full search traces for debugging and compliance
-- Keep the CLI and library easy to test
-- Avoid mission creep into IDE features or broad agent orchestration
-
 ## Project structure
 
 ```text
 reflex_search/
 ├── __init__.py
-├── core.py
+├── __main__.py
 ├── cli.py
+├── core.py
 └── models.py
 
 tests/

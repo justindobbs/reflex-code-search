@@ -47,7 +47,7 @@ Output should include:
 - each result with:
   - file path
   - score
-  - provider (`jev` or `llm_fallback`)
+  - provider (`local`, `jev`, or `fallback`)
   - short reason
   - short excerpt
 
@@ -80,15 +80,17 @@ for result in session.results:
 
 ### Relevance scoring
 
-- compute a relevance score per candidate using a fast local heuristic by default
-- optional backend can later plug in a Jev-compatible model
+- compute a relevance score per candidate using `LocalScorer` (fast term-overlap heuristic) by default
+- optionally use `JevScorer` for live scoring via the Jev Decisions API (`--live` flag)
+- any custom scorer can be plugged in via the `Scorer` protocol
 - return a value between 0 and 1
 
 ### Confidence gate
 
-- accept if score is above a threshold
-- skip if clearly below threshold
-- use the fallback path only if configured and score is borderline
+- **accept** if score is above `accept_threshold` (default 0.65)
+- **reject** if score is below `uncertain_threshold` (default 0.40)
+- **uncertain** if score is between the two thresholds — escalate to fallback if configured
+- optional `min_margin` check downgrades accept to uncertain when top scores are too close
 
 ### Fallback path
 
@@ -108,8 +110,9 @@ Each search emits a compact trace like:
 
 ```json
 [
-  {"step": 1, "provider": "jev", "score": 0.94, "decision": "accept", "path": "src/auth/middleware.py"},
-  {"step": 2, "provider": "jev", "score": 0.61, "decision": "skip", "path": "src/routes/api.py"}
+  {"step": 1, "provider": "local", "score": 0.94, "decision": "accept", "path": "src/auth/middleware.py"},
+  {"step": 2, "provider": "local", "score": 0.41, "decision": "uncertain", "path": "src/routes/api.py"},
+  {"step": 3, "provider": "local", "score": 0.12, "decision": "reject", "path": "src/utils/math.py"}
 ]
 ```
 
@@ -132,14 +135,16 @@ The tool should be considered good enough when it:
 
 ## Proposed first release
 
-Release 0.1.0 should include:
+Release 0.1.0 includes:
 
-- basic repo scanning
-- file relevance scoring
-- threshold-based selection
-- optional fallback callback
-- CLI and JSON output
-- unit tests covering core scenarios
+- basic repo scanning with configurable exclude lists
+- dual scoring: LocalScorer (offline) and JevScorer (live via Jev API)
+- three-way confidence gate with margin check
+- optional fallback callback for uncertain candidates
+- CLI with --live, --json, --verbose, --with-fallback, --min-margin
+- security: state redactor, .env exclusion, secret-pattern filtering
+- python-dotenv auto-loading
+- 49 unit and integration tests
 
 ## Success metric
 

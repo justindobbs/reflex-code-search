@@ -1,5 +1,6 @@
-"""This module provides a package entrypoint for the project."""
+"""Package entrypoint: ``python -m reflex_search``."""
 
-from .core import ReflexCodeSearcher
+from reflex_search.cli import app
 
-__all__ = ["ReflexCodeSearcher"]
+if __name__ == "__main__":
+    app()

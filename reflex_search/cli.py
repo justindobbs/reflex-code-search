@@ -6,8 +6,11 @@ import json
 from pathlib import Path
 
 import typer
+from dotenv import load_dotenv
 
-from reflex_search.core import ReflexCodeSearcher, SearchSession
+from reflex_search.fallback import default_fallback_scorer
+from reflex_search.scorers import JevScorer, LocalScorer
+from reflex_search.searcher import ReflexCodeSearcher
 
 app = typer.Typer(help="Search repository files with a lightweight REFLEX-style loop.")
 
@@ -17,12 +20,29 @@ def search(
     query: str = typer.Argument(..., help="Natural-language question to answer with file discovery."),
     repo_root: str = typer.Argument(".", help="Repository root to search."),
     top_k: int = typer.Option(5, "--top-k", help="Maximum number of files to return."),
-    threshold: float = typer.Option(0.65, "--threshold", help="Minimum score to accept a candidate."),
+    threshold: float = typer.Option(0.65, "--threshold", help="Accept threshold for the confidence gate."),
+    uncertain: float = typer.Option(0.40, "--uncertain", help="Uncertain threshold below which candidates are rejected."),
+    min_margin: float = typer.Option(0.0, "--min-margin", help="Minimum score margin for accept (ported from tracecore-reflex)."),
+    with_fallback: bool = typer.Option(False, "--with-fallback", help="Enable the default fallback scorer for uncertain candidates."),
+    live: bool = typer.Option(False, "--live", help="Use the Jev Decisions API for scoring (requires OPENROUTER_API_KEY)."),
+    verbose: bool = typer.Option(False, "--verbose", help="Print the full audit trail after results."),
     json_output: bool = typer.Option(False, "--json", help="Emit JSON instead of plain text."),
 ) -> None:
+    load_dotenv()
     root = Path(repo_root).resolve()
-    searcher = ReflexCodeSearcher(repo_root=str(root), threshold=threshold, top_k=top_k)
+    scorer = JevScorer() if live else LocalScorer()
+    fallback = default_fallback_scorer if with_fallback else None
+    searcher = ReflexCodeSearcher(
+        repo_root=str(root),
+        scorer=scorer,
+        accept_threshold=threshold,
+        uncertain_threshold=uncertain,
+        min_margin=min_margin,
+        fallback=fallback,
+        top_k=top_k,
+    )
     session = searcher.search(query=query)
+
     if json_output:
         payload = {
             "query": session.query,
@@ -43,7 +63,7 @@ def search(
         raise typer.Exit()
 
     typer.echo(f"Query: {query}")
-typer.echo(f"Repo: {root}")
+    typer.echo(f"Repo: {root}")
     typer.echo("")
 
     if not session.results:
@@ -55,6 +75,15 @@ typer.echo(f"Repo: {root}")
         typer.echo(f"  reason: {result.reason}")
         if result.excerpt:
             typer.echo(f"  excerpt: {result.excerpt[:180]}")
+        typer.echo("")
+
+    if verbose and session.audit_trail:
+        typer.echo("--- Audit Trail ---")
+        for entry in session.audit_trail:
+            typer.echo(
+                f"  step {entry['step']:>3}  [{entry['provider']}]  "
+                f"{entry['score']:.2f}  {entry['decision']:<9}  {entry['path']}"
+            )
         typer.echo("")
 
 

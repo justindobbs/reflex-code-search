@@ -1,0 +1,131 @@
+{
+  "version": "1.0",
+  "description": "Hand-labelled queries for benchmarking reflex-code-search recall.",
+  "suites": [
+    {
+      "name": "reflex-code-search",
+      "repo_root": ".",
+      "queries": [
+        {
+          "query": "How does the confidence gate decide whether to accept or reject?",
+          "expected_files": [
+            "reflex_search/core.py",
+            "reflex_search/models.py"
+          ]
+        },
+        {
+          "query": "Where is the CLI entry point defined?",
+          "expected_files": [
+            "reflex_search/cli.py",
+            "reflex_search/__main__.py"
+          ]
+        },
+        {
+          "query": "How does the Jev API scorer work?",
+          "expected_files": [
+            "reflex_search/core.py"
+          ]
+        },
+        {
+          "query": "What data model holds search results?",
+          "expected_files": [
+            "reflex_search/models.py"
+          ]
+        },
+        {
+          "query": "How are files collected from the repository?",
+          "expected_files": [
+            "reflex_search/core.py"
+          ]
+        },
+        {
+          "query": "Where are the public exports defined?",
+          "expected_files": [
+            "reflex_search/__init__.py"
+          ]
+        },
+        {
+          "query": "How is the fallback scorer invoked for uncertain candidates?",
+          "expected_files": [
+            "reflex_search/core.py"
+          ]
+        },
+        {
+          "query": "What file extensions are considered scannable?",
+          "expected_files": [
+            "reflex_search/core.py"
+          ]
+        },
+        {
+          "query": "How is the audit trail structured?",
+          "expected_files": [
+            "reflex_search/core.py",
+            "reflex_search/models.py",
+            "docs/architecture.md"
+          ]
+        },
+        {
+          "query": "Where are unit tests for the confidence gate?",
+          "expected_files": [
+            "tests/test_core.py"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "tracecore-reflex",
+      "repo_root": "../tracecore-reflex",
+      "queries": [
+        {
+          "query": "How does the agent decide between Jev and LLM fallback?",
+          "expected_files": [
+            "reflex_agent/agent.py",
+            "reflex_agent/confidence_gate.py"
+          ]
+        },
+        {
+          "query": "Where is the Jev client that calls the decisions API?",
+          "expected_files": [
+            "reflex_agent/jev_client.py"
+          ]
+        },
+        {
+          "query": "How is per-step telemetry tracked?",
+          "expected_files": [
+            "reflex_agent/telemetry.py"
+          ]
+        },
+        {
+          "query": "How does the confidence gate evaluate a Jev answer?",
+          "expected_files": [
+            "reflex_agent/confidence_gate.py"
+          ]
+        },
+        {
+          "query": "Where is the TraceCore-loadable agent configured?",
+          "expected_files": [
+            "reflex_agent/loadable_agent.py"
+          ]
+        },
+        {
+          "query": "How do validators use Jev for task scoring?",
+          "expected_files": [
+            "validators/jev_informed.py"
+          ]
+        },
+        {
+          "query": "What does the threshold sweep tool measure?",
+          "expected_files": [
+            "tools/threshold_sweep.py"
+          ]
+        },
+        {
+          "query": "Where is the incident triage example?",
+          "expected_files": [
+            "examples/incident_triage.py"
+          ]
+        }
+      ]
+    }
+  ]
+}

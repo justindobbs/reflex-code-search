@@ -106,21 +106,20 @@ class LocalScorer:
 class JevScorer:
     """Relevance scorer backed by the Jev Decisions API via OpenRouter.
 
-    Uses the Jev **score** primitive with a relevance rubric to rank
-    file-to-query relevance.  Falls back to ``LocalScorer`` on API errors.
+    Uses the Jev **noul** primitive (calibrated yes/no probability) to judge
+    whether a file contains the implementation that answers a query.
+    Falls back to ``LocalScorer`` on API errors.
 
     Implements the ``Scorer`` protocol from ``reflex_search.models``.
     """
 
     provider = "jev"
 
-    _RELEVANCE_LEVELS = [
-        "Not relevant — the file has no connection to the query",
-        "Weakly relevant — the file touches on a related topic but does not address the query",
-        "Moderately relevant — the file contains some information that helps answer the query",
-        "Strongly relevant — the file directly addresses the query",
-        "Exact match — the file is the primary answer to the query",
-    ]
+    _NOUL_INSTRUCTION = (
+        "Does this file contain the implementation or definition "
+        "that directly answers the question?  "
+        "Documentation or changelogs that merely mention the topic do not count."
+    )
 
     _SECRET_PATTERNS = (
         "api_key", "api-key", "apikey",
@@ -180,9 +179,8 @@ class JevScorer:
             "state": state,
             "questions": {
                 "relevance": {
-                    "type": "score",
-                    "instructions": f"How relevant is this file to the question: {query}",
-                    "criteria": self._RELEVANCE_LEVELS,
+                    "type": "noul",
+                    "instructions": f"{self._NOUL_INSTRUCTION} Question: {query}",
                 }
             },
         }
@@ -216,11 +214,11 @@ class JevScorer:
             self.last_input_tokens = usage.get("input_tokens", 0)
 
             answer = body.get("answers", {}).get("relevance", {})
-            raw_score = answer.get("score")
-            if raw_score is not None and isinstance(raw_score, (int, float)):
-                return round(min(max(float(raw_score), 0.0), 1.0), 4)
+            raw_noul = answer.get("noul")
+            if raw_noul is not None and isinstance(raw_noul, (int, float)):
+                return round(min(max(float(raw_noul), 0.0), 1.0), 4)
 
-            logger.warning("Jev returned no score, falling back to local")
+            logger.warning("Jev returned no noul value, falling back to local")
             return self._fallback.score(file_path, query, content)
         except Exception as exc:
             logger.warning("Jev API error (%s), falling back to local", type(exc).__name__)

@@ -43,9 +43,9 @@ A fast term-overlap heuristic with no API calls:
 
 #### `JevScorer` (live, requires API key)
 
-Calls the [Jev Decisions API](https://openrouter.ai/api/alpha/decisions) via OpenRouter using the **score** primitive with a five-level relevance rubric. This is the same API used by [tracecore-reflex](https://github.com/justindobbs/tracecore-reflex), but called directly with `httpx` — no dependency on the tracecore-reflex package.
+Calls the [Jev Decisions API](https://openrouter.ai/api/alpha/decisions) via OpenRouter using the **noul** primitive — a calibrated yes/no probability that judges whether a file contains the implementation answering the query. Documentation and changelogs that merely mention a topic are deprioritized. This is the same API used by [tracecore-reflex](https://github.com/justindobbs/tracecore-reflex) and [jevgrep](https://jevgrep.com/), called directly with `httpx` — no dependency on either package.
 
-On API errors or missing keys, `JevScorer` falls back to `LocalScorer` automatically. Each call records `latency_ms`, `cost`, and `input_tokens` for the audit trail.
+On API errors, HTTP 401 (bad key), or HTTP 429 (rate limited), `JevScorer` falls back to `LocalScorer` automatically with a log warning. Each call records `latency_ms`, `cost`, and `input_tokens` for the audit trail. A `state_redactor` callback strips lines matching common secret patterns before content is sent to the API.
 
 ### 3. Confidence gate (`ConfidenceGate`)
 

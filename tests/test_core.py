@@ -74,8 +74,8 @@ class TestJevScorer:
         mock_resp.json.return_value = {
             "answers": {
                 "relevance": {
-                    "type": "score",
-                    "score": 0.85,
+                    "type": "noul",
+                    "noul": 0.85,
                 }
             },
             "usage": {
@@ -104,10 +104,10 @@ class TestJevScorer:
         assert result > 0.0
 
     @patch("reflex_search.core.httpx.post")
-    def test_api_returns_no_score_falls_back(self, mock_post):
+    def test_api_returns_no_noul_falls_back(self, mock_post):
         mock_resp = MagicMock()
         mock_resp.raise_for_status = MagicMock()
-        mock_resp.json.return_value = {"answers": {"relevance": {"type": "score"}}, "usage": {}}
+        mock_resp.json.return_value = {"answers": {"relevance": {"type": "noul"}}, "usage": {}}
         mock_post.return_value = mock_resp
 
         scorer = JevScorer(api_key="test-key")
@@ -116,11 +116,11 @@ class TestJevScorer:
         assert result > 0.0
 
     @patch("reflex_search.core.httpx.post")
-    def test_score_clamped_to_0_1(self, mock_post):
+    def test_noul_clamped_to_0_1(self, mock_post):
         mock_resp = MagicMock()
         mock_resp.raise_for_status = MagicMock()
         mock_resp.json.return_value = {
-            "answers": {"relevance": {"type": "score", "score": 1.5}},
+            "answers": {"relevance": {"type": "noul", "noul": 1.5}},
             "usage": {},
         }
         mock_post.return_value = mock_resp

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+
 """Benchmark harness for reflex-code-search.
 
 Reads benchmarks/queries.json, runs each query through ReflexCodeSearcher

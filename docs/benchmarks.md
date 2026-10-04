@@ -6,7 +6,7 @@ Measured recall, latency, and cost of reflex-code-search across two hand-labelle
 
 - **Dataset**: 18 hand-labelled queries across 2 repos (10 for reflex-code-search, 8 for tracecore-reflex)
 - **Metric**: recall@k — fraction of expected files that appear in the top-k results
-- **LocalScorer**: term-overlap heuristic (30% path weight, 70% content weight), no API calls. Threshold 0.30.
+- **LocalScorer v2**: 25% path unigrams, 45% content unigrams, 15% bigrams, 15% definition boosting, stopword-filtered. Threshold 0.30.
 - **JevScorer**: Jev Decisions API `noul` primitive (calibrated yes/no probability) via OpenRouter. Threshold 0.10.
 - **Harness**: `tools/bench.py` — reproducible, `--max-queries` for quick runs
 
@@ -14,40 +14,45 @@ Measured recall, latency, and cost of reflex-code-search across two hand-labelle
 
 | Mode | reflex-code-search | tracecore-reflex | Avg latency | Cost per query |
 |------|-------------------|-----------------|-------------|---------------|
-| **Local** (offline) | 25% recall | 88% recall | ~350–600ms | $0 |
+| **Local v1** (pre-refactor) | 25% recall | 88% recall | ~350ms | $0 |
+| **Local v2** (post-refactor) | 60% recall | 100% recall | ~290ms | $0 |
 | **Jev** (live noul) | 83% recall | 100% recall | ~15–18s | ~$0.0005 |
 
-## Results: LocalScorer (offline, threshold=0.30)
+The v1→v2 improvement comes from two changes:
+1. Splitting `core.py` into focused modules with descriptive names (`gate.py`, `scorers.py`, `searcher.py`, `file_collector.py`, `fallback.py`)
+2. Improving LocalScorer with bigram matching, definition-aware boosting, and stopword filtering
 
-### reflex-code-search (this repo, 12 files)
+## Results: LocalScorer v2 (offline, threshold=0.30)
+
+### reflex-code-search (this repo, 18 files)
 
 | Query | Recall | Latency | Hits / Expected |
 |-------|--------|---------|-----------------|
-| How does the confidence gate decide whether to accept or reject? | 0% | 1059ms | 0/2 |
-| Where is the CLI entry point defined? | 50% | 341ms | 1/2 |
-| How does the Jev API scorer work? | 0% | 300ms | 0/1 |
-| What data model holds search results? | 100% | 263ms | 1/1 |
-| How are files collected from the repository? | 0% | 253ms | 0/1 |
-| Where are the public exports defined? | 0% | 253ms | 0/1 |
-| How is the fallback scorer invoked for uncertain candidates? | 0% | 279ms | 0/1 |
-| What file extensions are considered scannable? | 0% | 263ms | 0/1 |
-| How is the audit trail structured? | 0% | 260ms | 0/3 |
-| Where are unit tests for the confidence gate? | 100% | 266ms | 1/1 |
-| **Average** | **25%** | **349ms** | |
+| How does the confidence gate decide whether to accept or reject? | 50% | 286ms | 1/2 |
+| Where is the CLI entry point defined? | 100% | 321ms | 2/2 |
+| How does the Jev API scorer work? | 100% | 369ms | 1/1 |
+| What data model holds search results? | 100% | 276ms | 1/1 |
+| How are files collected from the repository? | 0% | 277ms | 0/1 |
+| Where are the public exports defined? | 100% | 264ms | 1/1 |
+| How is the fallback scorer invoked for uncertain candidates? | 50% | 280ms | 1/2 |
+| What file extensions are considered scannable? | 0% | 258ms | 0/1 |
+| How is the audit trail structured? | 0% | 265ms | 0/3 |
+| Where are unit tests for the confidence gate? | 100% | 273ms | 1/1 |
+| **Average** | **60%** | **287ms** | |
 
 ### tracecore-reflex (23 files)
 
 | Query | Recall | Latency | Hits / Expected |
 |-------|--------|---------|-----------------|
-| How does the agent decide between Jev and LLM fallback? | 100% | 1906ms | 2/2 |
-| Where is the Jev client that calls the decisions API? | 0% | 468ms | 0/1 |
-| How is per-step telemetry tracked? | 100% | 477ms | 1/1 |
-| How does the confidence gate evaluate a Jev answer? | 100% | 463ms | 1/1 |
-| Where is the TraceCore-loadable agent configured? | 100% | 450ms | 1/1 |
-| How do validators use Jev for task scoring? | 100% | 448ms | 1/1 |
-| What does the threshold sweep tool measure? | 100% | 465ms | 1/1 |
-| Where is the incident triage example? | 100% | 454ms | 1/1 |
-| **Average** | **88%** | **616ms** | |
+| How does the agent decide between Jev and LLM fallback? | 100% | 463ms | 2/2 |
+| Where is the Jev client that calls the decisions API? | 100% | 448ms | 1/1 |
+| How is per-step telemetry tracked? | 100% | 444ms | 1/1 |
+| How does the confidence gate evaluate a Jev answer? | 100% | 454ms | 1/1 |
+| Where is the TraceCore-loadable agent configured? | 100% | 459ms | 1/1 |
+| How do validators use Jev for task scoring? | 100% | 482ms | 1/1 |
+| What does the threshold sweep tool measure? | 100% | 479ms | 1/1 |
+| Where is the incident triage example? | 100% | 460ms | 1/1 |
+| **Average** | **100%** | **461ms** | |
 
 ## Results: JevScorer (live noul, threshold=0.10)
 

@@ -28,7 +28,8 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_PROJECT_ROOT))
 load_dotenv(_PROJECT_ROOT / ".env")
 
-from reflex_search.core import JevScorer, LocalScorer, ReflexCodeSearcher  # noqa: E402
+from reflex_search.scorers import JevScorer, LocalScorer
+from reflex_search.searcher import ReflexCodeSearcher
 
 
 def _load_queries(path: Path) -> dict[str, Any]:

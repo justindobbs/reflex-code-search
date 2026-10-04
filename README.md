@@ -2,7 +2,7 @@
 
 A small, focused implementation of semantic code search using a REFLEX-style control loop:
 
-- fast local relevance scoring for file ranking (offline by default)
+- fast local relevance scoring with bigram matching and definition boosting (offline by default)
 - optional live scoring via the [Jev Decisions API](https://openrouter.ai/api/alpha/decisions)
 - three-way confidence gate (accept / uncertain / reject) with margin check
 - optional fallback scorer for uncertain matches
@@ -41,7 +41,10 @@ source .venv/bin/activate
 # Windows
 .venv\Scripts\activate
 
-python -m pip install -e .
+pip install -e .
+
+# With dev tools (pytest, ruff)
+pip install -e ".[dev]"
 ```
 
 ## Usage
@@ -53,9 +56,9 @@ reflex-search "How is scoring done?" .
 ```
 
 ```
-[local] 0.53  README.md
+[local] 0.55  reflex_search\scorers.py
   reason: Accepted by confidence gate
-[local] 0.53  docs\release-spec.md
+[local] 0.48  docs\release-spec.md
   reason: Accepted by confidence gate
 ```
 
@@ -66,10 +69,9 @@ reflex-search "confidence gate" . --threshold 0.3
 ```
 
 ```
-[local] 0.70  README.md
-[local] 0.70  reflex_search\__init__.py
-[local] 0.70  reflex_search\cli.py
-[local] 0.70  tests\test_core.py
+[local] 0.70  reflex_search\gate.py
+[local] 0.58  tests\test_core.py
+[local] 0.55  reflex_search\searcher.py
 ```
 
 Verbose mode shows every candidate's score and the gate decision:
@@ -80,11 +82,10 @@ reflex-search "How is scoring done?" . --verbose --threshold 0.3
 
 ```
 --- Audit Trail ---
-  step   1  [local]  0.53  accept     README.md
-  step   2  [local]  0.35  reject     docs\architecture.md
-  step   3  [local]  0.53  accept     docs\release-spec.md
-  step  12  [local]  0.35  reject     reflex_search\cli.py
-  step  13  [local]  0.35  reject     reflex_search\core.py
+  step   1  [local]  0.30  reject     CHANGELOG.md
+  step   2  [local]  0.48  accept     docs\release-spec.md
+  step   3  [local]  0.35  reject     reflex_search\cli.py
+  step   4  [local]  0.55  accept     reflex_search\scorers.py
   ...
 ```
 
@@ -207,12 +208,28 @@ reflex_search/
 ├── __init__.py        # public exports
 ├── __main__.py        # python -m reflex_search entrypoint
 ├── cli.py             # typer CLI
-├── core.py            # search loop, LocalScorer, JevScorer, confidence gate
-└── models.py          # data classes, Scorer protocol
+├── core.py            # backward-compatible re-exports
+├── fallback.py        # default fallback scorer
+├── file_collector.py  # repo file discovery and exclusions
+├── gate.py            # three-way confidence gate
+├── models.py          # data classes, Scorer protocol
+├── scorers.py         # LocalScorer, JevScorer
+└── searcher.py        # REFLEX search loop orchestrator
 
 tests/
 ├── test_core.py       # unit tests for scorer, gate, searcher
 └── test_cli.py        # CLI integration tests
+
+benchmarks/
+└── queries.json       # hand-labelled dataset (18 queries, 2 repos)
+
+tools/
+└── bench.py           # benchmark harness (recall@k, latency, cost)
+
+docs/
+├── architecture.md    # design and component docs
+├── benchmarks.md      # benchmark results and jevgrep comparison
+└── release-spec.md    # release specification
 ```
 
 ## License

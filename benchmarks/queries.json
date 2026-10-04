@@ -9,7 +9,7 @@
         {
           "query": "How does the confidence gate decide whether to accept or reject?",
           "expected_files": [
-            "reflex_search/core.py",
+            "reflex_search/gate.py",
             "reflex_search/models.py"
           ]
         },
@@ -23,7 +23,7 @@
         {
           "query": "How does the Jev API scorer work?",
           "expected_files": [
-            "reflex_search/core.py"
+            "reflex_search/scorers.py"
           ]
         },
         {
@@ -35,7 +35,7 @@
         {
           "query": "How are files collected from the repository?",
           "expected_files": [
-            "reflex_search/core.py"
+            "reflex_search/file_collector.py"
           ]
         },
         {
@@ -47,19 +47,20 @@
         {
           "query": "How is the fallback scorer invoked for uncertain candidates?",
           "expected_files": [
-            "reflex_search/core.py"
+            "reflex_search/searcher.py",
+            "reflex_search/fallback.py"
           ]
         },
         {
           "query": "What file extensions are considered scannable?",
           "expected_files": [
-            "reflex_search/core.py"
+            "reflex_search/file_collector.py"
           ]
         },
         {
           "query": "How is the audit trail structured?",
           "expected_files": [
-            "reflex_search/core.py",
+            "reflex_search/searcher.py",
             "reflex_search/models.py",
             "docs/architecture.md"
           ]

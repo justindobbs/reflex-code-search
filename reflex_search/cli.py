@@ -8,7 +8,9 @@ from pathlib import Path
 import typer
 from dotenv import load_dotenv
 
-from reflex_search.core import JevScorer, LocalScorer, ReflexCodeSearcher, default_fallback_scorer
+from reflex_search.fallback import default_fallback_scorer
+from reflex_search.scorers import JevScorer, LocalScorer
+from reflex_search.searcher import ReflexCodeSearcher
 
 app = typer.Typer(help="Search repository files with a lightweight REFLEX-style loop.")
 

@@ -1,17 +1,12 @@
 """Unit tests for the core search logic."""
 
-import math
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-from reflex_search.core import (
-    ConfidenceGate,
-    JevScorer,
-    LocalScorer,
-    ReflexCodeSearcher,
-    default_fallback_scorer,
-)
+from reflex_search.fallback import default_fallback_scorer
+from reflex_search.gate import ConfidenceGate
 from reflex_search.models import GateDecision
-
+from reflex_search.scorers import JevScorer, LocalScorer
+from reflex_search.searcher import ReflexCodeSearcher
 
 # ---------------------------------------------------------------------------
 # LocalScorer
@@ -66,7 +61,7 @@ class TestJevScorer:
         assert score > 0.0
         assert scorer.last_latency_ms == 0.0
 
-    @patch("reflex_search.core.httpx.post")
+    @patch("reflex_search.scorers.httpx.post")
     def test_successful_api_call(self, mock_post):
         mock_resp = MagicMock()
         mock_resp.status_code = 200
@@ -94,7 +89,7 @@ class TestJevScorer:
         assert scorer.last_latency_ms >= 0.0
         mock_post.assert_called_once()
 
-    @patch("reflex_search.core.httpx.post")
+    @patch("reflex_search.scorers.httpx.post")
     def test_api_error_falls_back_to_local(self, mock_post):
         mock_post.side_effect = Exception("connection refused")
 
@@ -103,7 +98,7 @@ class TestJevScorer:
 
         assert result > 0.0
 
-    @patch("reflex_search.core.httpx.post")
+    @patch("reflex_search.scorers.httpx.post")
     def test_api_returns_no_noul_falls_back(self, mock_post):
         mock_resp = MagicMock()
         mock_resp.raise_for_status = MagicMock()
@@ -115,7 +110,7 @@ class TestJevScorer:
 
         assert result > 0.0
 
-    @patch("reflex_search.core.httpx.post")
+    @patch("reflex_search.scorers.httpx.post")
     def test_noul_clamped_to_0_1(self, mock_post):
         mock_resp = MagicMock()
         mock_resp.raise_for_status = MagicMock()
@@ -128,7 +123,7 @@ class TestJevScorer:
         scorer = JevScorer(api_key="test-key")
         assert scorer.score("a.py", "q", "c") <= 1.0
 
-    @patch("reflex_search.core.httpx.post")
+    @patch("reflex_search.scorers.httpx.post")
     def test_401_falls_back_with_warning(self, mock_post):
         mock_resp = MagicMock()
         mock_resp.status_code = 401
@@ -138,7 +133,7 @@ class TestJevScorer:
         result = scorer.score("auth.py", "auth", "def require_auth(): pass")
         assert result > 0.0
 
-    @patch("reflex_search.core.httpx.post")
+    @patch("reflex_search.scorers.httpx.post")
     def test_429_falls_back_with_warning(self, mock_post):
         mock_resp = MagicMock()
         mock_resp.status_code = 429
@@ -334,7 +329,7 @@ class TestReflexCodeSearcher:
             uncertain_threshold=0.98,
             fallback=spy,
         )
-        session = searcher.search("completely unrelated quantum physics topic")
+        searcher.search("completely unrelated quantum physics topic")
 
         assert not called
 

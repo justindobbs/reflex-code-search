@@ -27,6 +27,10 @@ The searcher scans a repo and collects candidate text files, excluding common no
 - vendored dependencies
 - large binary-like files (>250 KB)
 
+It also respects `.gitignore` files at the repository root and in nested directories,
+including negated patterns that re-include files. The built-in exclusions above still
+apply even if an ignore rule would otherwise re-include a path.
+
 This step is meant to be cheap and deterministic.
 
 ### 2. Relevance scoring

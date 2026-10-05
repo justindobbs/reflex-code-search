@@ -7,6 +7,7 @@ A small, focused implementation of semantic code search using a REFLEX-style con
 - three-way confidence gate (accept / uncertain / reject) with margin check
 - optional fallback scorer for uncertain matches
 - small, auditable search sessions with per-step telemetry
+- repository discovery that respects nested `.gitignore` files
 - CLI-first design for local repository discovery
 
 This project is intentionally narrow. It is not a broad coding-agent runtime, IDE, or repo management platform. It is a minimal primitive: given a natural-language question, find the files most likely to be relevant.
@@ -45,6 +46,20 @@ pip install -e .
 
 # With dev tools (pytest, ruff)
 pip install -e ".[dev]"
+```
+
+## Development checks
+
+After installing the dev tools, run the test suite with pytest:
+
+```bash
+python -m pytest tests/ -v
+```
+
+Run Ruff to check code style and common issues:
+
+```bash
+python -m ruff check .
 ```
 
 ## Usage

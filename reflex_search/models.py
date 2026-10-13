@@ -25,11 +25,26 @@ class SearchResult:
 
 
 @dataclass
+class SessionTelemetry:
+    """Aggregate telemetry for a search session."""
+
+    files_scanned: int = 0
+    accepted: int = 0
+    uncertain: int = 0
+    rejected: int = 0
+    fallback_calls: int = 0
+    total_latency_ms: float = 0.0
+    total_cost: float = 0.0
+    total_tokens: int = 0
+
+
+@dataclass
 class SearchSession:
     query: str
     repo_root: str
     results: list[SearchResult] = field(default_factory=list)
     audit_trail: list[dict[str, Any]] = field(default_factory=list)
+    telemetry: SessionTelemetry | None = None
 
 
 @runtime_checkable
@@ -44,4 +59,5 @@ __all__ = [
     "Scorer",
     "SearchResult",
     "SearchSession",
+    "SessionTelemetry",
 ]

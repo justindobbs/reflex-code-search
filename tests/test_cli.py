@@ -46,12 +46,41 @@ class TestCliJson:
         assert "results" in payload
         assert "audit_trail" in payload
 
+    def test_json_includes_telemetry(self, tmp_path):
+        repo = _make_repo(tmp_path)
+        result = runner.invoke(app, ["auth", str(repo), "--json", "--threshold", "0.3"])
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert "telemetry" in payload
+        t = payload["telemetry"]
+        assert "files_scanned" in t
+        assert "accepted" in t
+        assert "rejected" in t
+        assert "fallback_calls" in t
+        assert t["files_scanned"] > 0
+
 
 class TestCliFallback:
     def test_with_fallback_flag(self, tmp_path):
         repo = _make_repo(tmp_path)
         result = runner.invoke(app, ["auth", str(repo), "--with-fallback", "--threshold", "0.3"])
         assert result.exit_code == 0
+
+
+class TestCliSmartFallback:
+    def test_mutual_exclusion_with_fallback(self):
+        result = runner.invoke(app, ["query", ".", "--with-fallback", "--smart-fallback"])
+        assert result.exit_code == 1
+
+
+class TestCliStats:
+    def test_stats_prints_summary(self, tmp_path):
+        repo = _make_repo(tmp_path)
+        result = runner.invoke(app, ["auth", str(repo), "--stats", "--threshold", "0.3"])
+        assert result.exit_code == 0
+        assert "files" in result.output
+        assert "accepted" in result.output
+        assert "rejected" in result.output
 
 
 class TestCliVerbose:

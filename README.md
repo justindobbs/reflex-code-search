@@ -116,6 +116,12 @@ With the built-in fallback scorer for uncertain candidates:
 reflex-search "auth middleware" . --with-fallback --verbose
 ```
 
+With smart Jev fallback — only uncertain candidates are sent to the API:
+
+```bash
+reflex-search "How is the audit trail structured?" . --smart-fallback --verbose
+```
+
 With live Jev API scoring (requires `OPENROUTER_API_KEY`):
 
 ```bash
@@ -131,9 +137,13 @@ reflex-search "How does the search loop work?" . --live --verbose
 | `--uncertain` | 0.40 | Uncertain threshold below which candidates are rejected |
 | `--min-margin` | 0.0 | Minimum score margin for accept (ported from tracecore-reflex) |
 | `--with-fallback` | off | Enable the default fallback scorer |
-| `--live` | off | Use the Jev Decisions API for scoring |
+| `--smart-fallback` | off | Use Jev API as fallback for uncertain candidates (mutually exclusive with `--with-fallback`) |
+| `--live` | off | Two-pass: LocalScorer pre-filters, Jev re-scores shortlist |
+| `--live-all` | off | Score every file with Jev (no pre-filter) |
+| `--shortlist` | 20 | Number of files to shortlist for two-pass live mode |
 | `--verbose` | off | Print the full audit trail after results |
-| `--json` | off | Emit JSON instead of plain text |
+| `--stats` | off | Print a one-line session telemetry summary |
+| `--json` | off | Emit JSON instead of plain text (includes telemetry block) |
 
 ## Example output
 

@@ -1,5 +1,5 @@
 {
-  "version": "1.0",
+  "version": "2.0",
   "description": "Hand-labelled queries for benchmarking reflex-code-search recall.",
   "suites": [
     {
@@ -70,6 +70,71 @@
           "expected_files": [
             "tests/test_core.py"
           ]
+        },
+        {
+          "query": "How does the local scorer handle synonym expansion?",
+          "expected_files": [
+            "reflex_search/scorers.py"
+          ]
+        },
+        {
+          "query": "Where is docstring boosting implemented?",
+          "expected_files": [
+            "reflex_search/scorers.py"
+          ]
+        },
+        {
+          "query": "How does the two-pass live search reduce API calls?",
+          "expected_files": [
+            "reflex_search/searcher.py",
+            "reflex_search/cli.py"
+          ]
+        },
+        {
+          "query": "What aggregate telemetry is available after a search session?",
+          "expected_files": [
+            "reflex_search/models.py",
+            "reflex_search/searcher.py"
+          ]
+        },
+        {
+          "query": "How does the smart Jev fallback differ from the default fallback?",
+          "expected_files": [
+            "reflex_search/fallback.py"
+          ]
+        },
+        {
+          "query": "Where is the benchmark harness that runs recall tests?",
+          "expected_files": [
+            "tools/bench.py",
+            "benchmarks/queries.json"
+          ]
+        },
+        {
+          "query": "What dependencies does the project require?",
+          "expected_files": [
+            "pyproject.toml"
+          ]
+        },
+        {
+          "query": "How does the stemmer normalize query terms?",
+          "expected_files": [
+            "reflex_search/scorers.py"
+          ]
+        },
+        {
+          "query": "Where are the gitignore exclusion rules applied during file collection?",
+          "expected_files": [
+            "reflex_search/file_collector.py",
+            "tests/test_file_collector.py"
+          ]
+        },
+        {
+          "query": "How is the project architecture documented?",
+          "expected_files": [
+            "docs/architecture.md",
+            "docs/release-spec.md"
+          ]
         }
       ]
     },
@@ -124,6 +189,58 @@
           "query": "Where is the incident triage example?",
           "expected_files": [
             "examples/incident_triage.py"
+          ]
+        },
+        {
+          "query": "How are action arguments resolved from a Jev response?",
+          "expected_files": [
+            "reflex_agent/arg_resolver.py",
+            "tests/test_arg_resolver.py"
+          ]
+        },
+        {
+          "query": "How does the natural escalation example demonstrate the REFLEX loop?",
+          "expected_files": [
+            "examples/natural_escalation.py"
+          ]
+        },
+        {
+          "query": "Where does the policy comparison example compare different agent strategies?",
+          "expected_files": [
+            "examples/policy_comparison.py"
+          ]
+        },
+        {
+          "query": "How does the run report tool summarize experiment results?",
+          "expected_files": [
+            "tools/run_report.py"
+          ]
+        },
+        {
+          "query": "What does the compare_runs tool do?",
+          "expected_files": [
+            "tools/compare_runs.py",
+            "tests/test_compare_runs.py"
+          ]
+        },
+        {
+          "query": "How are step-level labels assigned and tested?",
+          "expected_files": [
+            "tools/step_labels.py",
+            "tests/test_step_labels.py"
+          ]
+        },
+        {
+          "query": "Where is the project configuration for model names and gate settings?",
+          "expected_files": [
+            "reflex.toml",
+            "pyproject.toml"
+          ]
+        },
+        {
+          "query": "What experiment checklist guides reproducible runs?",
+          "expected_files": [
+            "docs/experiment-checklist.md"
           ]
         }
       ]

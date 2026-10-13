@@ -1,5 +1,10 @@
 # reflex-code-search
 
+[![CI](https://github.com/justindobbs/reflex-code-search/actions/workflows/ci.yml/badge.svg)](https://github.com/justindobbs/reflex-code-search/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Code Style: Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+
 A small, focused implementation of semantic code search using a REFLEX-style control loop:
 
 - fast local relevance scoring with bigram matching and definition boosting (offline by default)

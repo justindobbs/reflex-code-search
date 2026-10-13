@@ -24,3 +24,6 @@ dist/
 # Local secrets / generated files
 .env
 *.log
+
+# Internal development plan (not committed)
+docs/development-plan.md

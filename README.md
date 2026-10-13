@@ -71,9 +71,7 @@ reflex-search "How is scoring done?" .
 ```
 
 ```
-[local] 0.55  reflex_search\scorers.py
-  reason: Accepted by confidence gate
-[local] 0.48  docs\release-spec.md
+[local] 0.84  reflex_search/scorers.py
   reason: Accepted by confidence gate
 ```
 
@@ -84,9 +82,11 @@ reflex-search "confidence gate" . --threshold 0.3
 ```
 
 ```
-[local] 0.70  reflex_search\gate.py
-[local] 0.58  tests\test_core.py
-[local] 0.55  reflex_search\searcher.py
+[local] 1.00  reflex_search/gate.py
+[local] 0.76  docs/benchmarks.md
+[local] 0.76  docs/release-spec.md
+[local] 0.70  reflex_search/scorers.py
+[local] 0.68  README.md
 ```
 
 Verbose mode shows every candidate's score and the gate decision:
@@ -97,10 +97,10 @@ reflex-search "How is scoring done?" . --verbose --threshold 0.3
 
 ```
 --- Audit Trail ---
-  step   1  [local]  0.30  reject     CHANGELOG.md
-  step   2  [local]  0.48  accept     docs\release-spec.md
-  step   3  [local]  0.35  reject     reflex_search\cli.py
-  step   4  [local]  0.55  accept     reflex_search\scorers.py
+  step   1  [local]  0.35  reject     CHANGELOG.md
+  step   2  [local]  0.35  reject     docs/release-spec.md
+  step   3  [local]  0.26  reject     reflex_search/cli.py
+  step   4  [local]  0.84  accept     reflex_search/scorers.py
   ...
 ```
 

@@ -46,6 +46,53 @@ class TestLocalScorer:
     def test_provider_attribute(self):
         assert LocalScorer.provider == "local"
 
+    def test_synonym_expansion_adds_related_terms(self):
+        scorer = LocalScorer()
+        expanded = scorer._expand_synonyms(["collect"])
+        assert "discover" in expanded
+        assert "walk" in expanded
+        assert "scan" in expanded
+        assert "collect" in expanded
+
+    def test_synonym_expansion_no_duplicates(self):
+        scorer = LocalScorer()
+        expanded = scorer._expand_synonyms(["collect", "discover"])
+        assert len(expanded) == len(set(expanded))
+
+    def test_synonym_expansion_unknown_term_unchanged(self):
+        scorer = LocalScorer()
+        expanded = scorer._expand_synonyms(["foobar"])
+        assert expanded == ["foobar"]
+
+    def test_synonym_expansion_improves_conceptual_query(self):
+        scorer = LocalScorer()
+        # "collected" contains "collect" which expands to walk/scan/discover/find
+        # file_collector.py's content uses "walk" and "scan" concepts
+        content = '"""File discovery for repository scanning."""\ndef collect_files(repo_root):\n    pass\n'
+        score_with_synonyms = scorer.score("file_collector.py", "How are files collected", content)
+        assert score_with_synonyms > 0.3, f"Expected >0.3, got {score_with_synonyms}"
+
+    def test_docstring_boosting_increases_score(self):
+        scorer = LocalScorer()
+        content_with_doc = '"""File discovery for repository scanning."""\ndef other_func():\n    pass\n'
+        content_without_doc = "def other_func():\n    pass\n"
+        score_with = scorer.score("utils.py", "file discovery scanning", content_with_doc)
+        score_without = scorer.score("utils.py", "file discovery scanning", content_without_doc)
+        assert score_with > score_without
+
+    def test_docstring_boosting_python_module_docstring(self):
+        scorer = LocalScorer()
+        content = '"""Three-way confidence gate for the REFLEX search loop."""\nclass ConfidenceGate:\n    pass\n'
+        score = scorer.score("gate.py", "confidence gate", content)
+        assert score > 0.4, f"Expected >0.4, got {score}"
+
+    def test_content_preview_8000_chars(self):
+        scorer = LocalScorer()
+        # Place relevant content at position 5000 (beyond old 4000 limit)
+        content = "x = 1\n" * 800 + "authentication middleware check\n"
+        score = scorer.score("deep.py", "authentication middleware", content)
+        assert score > 0.0
+
 
 # ---------------------------------------------------------------------------
 # JevScorer (mocked HTTP)

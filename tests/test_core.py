@@ -282,6 +282,117 @@ class TestConfidenceGate:
 # default_fallback_scorer
 # ---------------------------------------------------------------------------
 
+class TestJevFallback:
+    @patch("reflex_search.scorers.httpx.post")
+    def test_delegates_to_jev_scorer(self, mock_post):
+        from reflex_search.fallback import JevFallback
+
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.raise_for_status = MagicMock()
+        mock_resp.json.return_value = {
+            "answers": {"relevance": {"type": "noul", "noul": 0.90}},
+            "usage": {"input_tokens": 200, "cost": 0.0002},
+        }
+        mock_post.return_value = mock_resp
+
+        fb = JevFallback(api_key="test-key")
+        score = fb("auth.py", "auth check", "def require_auth(): pass")
+
+        assert score == 0.9
+        assert fb.last_input_tokens == 200
+        assert fb.last_cost == 0.0002
+        assert fb.last_latency_ms >= 0.0
+        mock_post.assert_called_once()
+
+    def test_no_api_key_falls_back_to_local(self):
+        from reflex_search.fallback import JevFallback
+
+        fb = JevFallback(api_key="")
+        score = fb("auth.py", "auth", "def require_auth(): pass")
+        assert score > 0.0
+        assert fb.last_latency_ms == 0.0
+
+    def test_provider_attribute(self):
+        from reflex_search.fallback import JevFallback
+
+        assert JevFallback.provider == "jev-fallback"
+
+    @patch("reflex_search.scorers.httpx.post")
+    def test_only_called_for_uncertain_candidates(self, mock_post, tmp_path):
+        from reflex_search.fallback import JevFallback
+
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.raise_for_status = MagicMock()
+        mock_resp.json.return_value = {
+            "answers": {"relevance": {"type": "noul", "noul": 0.95}},
+            "usage": {"input_tokens": 100, "cost": 0.0001},
+        }
+        mock_post.return_value = mock_resp
+
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        # File that will score high locally (accepted, no fallback)
+        (repo / "auth.py").write_text("def require_auth(): pass", encoding="utf-8")
+        # File that will score zero locally (rejected, no fallback)
+        (repo / "math.py").write_text("def add(a, b): return a + b", encoding="utf-8")
+
+        fb = JevFallback(api_key="test-key")
+        searcher = ReflexCodeSearcher(
+            repo_root=str(repo),
+            accept_threshold=0.90,
+            uncertain_threshold=0.01,
+            fallback=fb,
+        )
+        session = searcher.search("require auth")
+
+        # auth.py should be uncertain (local score < 0.90) → fallback called
+        # math.py should be rejected (local score ~ 0) → fallback NOT called
+        fb_steps = [s for s in session.audit_trail if s["provider"] == "jev-fallback"]
+        reject_steps = [s for s in session.audit_trail if s["decision"] == "reject" and s["provider"] == "local"]
+        assert len(fb_steps) >= 1
+        assert len(reject_steps) >= 1
+
+    @patch("reflex_search.scorers.httpx.post")
+    def test_telemetry_in_audit_trail(self, mock_post, tmp_path):
+        from reflex_search.fallback import JevFallback
+
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.raise_for_status = MagicMock()
+        mock_resp.json.return_value = {
+            "answers": {"relevance": {"type": "noul", "noul": 0.80}},
+            "usage": {"input_tokens": 150, "cost": 0.00015},
+        }
+        mock_post.return_value = mock_resp
+
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        (repo / "handler.py").write_text(
+            "def handle_request(req):\n    return check_auth(req)\n",
+            encoding="utf-8",
+        )
+
+        fb = JevFallback(api_key="test-key")
+        searcher = ReflexCodeSearcher(
+            repo_root=str(repo),
+            accept_threshold=0.90,
+            uncertain_threshold=0.01,
+            fallback=fb,
+        )
+        session = searcher.search("request handling")
+
+        fb_steps = [s for s in session.audit_trail if s["provider"] == "jev-fallback"]
+        assert fb_steps
+        step = fb_steps[0]
+        assert "latency_ms" in step
+        assert "cost" in step
+        assert "input_tokens" in step
+        assert step["cost"] == 0.00015
+        assert step["input_tokens"] == 150
+
+
 class TestDefaultFallback:
     def test_empty_query(self):
         assert default_fallback_scorer("a.py", "", "content") == 0.0
@@ -440,3 +551,119 @@ class TestReflexCodeSearcher:
 
         audit_paths = [e["path"] for e in session.audit_trail]
         assert not any("egg-info" in p for p in audit_paths)
+
+    def test_telemetry_local_only(self, tmp_path):
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        (repo / "auth.py").write_text("def require_auth(): pass", encoding="utf-8")
+        (repo / "math.py").write_text("def add(a, b): return a + b", encoding="utf-8")
+
+        searcher = ReflexCodeSearcher(repo_root=str(repo), accept_threshold=0.3)
+        session = searcher.search("auth")
+
+        t = session.telemetry
+        assert t is not None
+        assert t.files_scanned == 2
+        assert t.accepted + t.uncertain + t.rejected == 2
+        assert t.fallback_calls == 0
+        assert t.total_cost == 0.0
+        assert t.total_tokens == 0
+
+    def test_telemetry_with_fallback(self, tmp_path):
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        (repo / "handler.py").write_text(
+            "def handle_request(req):\n    return check_auth(req)\n",
+            encoding="utf-8",
+        )
+
+        def always_high(_p: str, _q: str, _c: str) -> float:
+            return 0.95
+
+        searcher = ReflexCodeSearcher(
+            repo_root=str(repo),
+            accept_threshold=0.90,
+            uncertain_threshold=0.01,
+            fallback=always_high,
+        )
+        session = searcher.search("request handling")
+
+        t = session.telemetry
+        assert t is not None
+        assert t.fallback_calls >= 1
+
+    def test_telemetry_empty_repo(self, tmp_path):
+        repo = tmp_path / "empty"
+        repo.mkdir()
+
+        searcher = ReflexCodeSearcher(repo_root=str(repo))
+        session = searcher.search("anything")
+
+        t = session.telemetry
+        assert t is not None
+        assert t.files_scanned == 0
+        assert t.accepted == 0
+        assert t.rejected == 0
+
+    @patch("reflex_search.scorers.httpx.post")
+    def test_two_pass_calls_jev_only_for_shortlist(self, mock_post, tmp_path):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.raise_for_status = MagicMock()
+        mock_resp.json.return_value = {
+            "answers": {"relevance": {"type": "noul", "noul": 0.80}},
+            "usage": {"input_tokens": 100, "cost": 0.0001},
+        }
+        mock_post.return_value = mock_resp
+
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        for i in range(10):
+            (repo / f"file_{i}.py").write_text(f"content {i}", encoding="utf-8")
+
+        from reflex_search.scorers import JevScorer
+
+        searcher = ReflexCodeSearcher(repo_root=str(repo), accept_threshold=0.3)
+        session = searcher.search_two_pass(
+            "content",
+            jev_scorer=JevScorer(api_key="test-key"),
+            shortlist_size=3,
+        )
+
+        # Jev should only be called for 3 shortlisted files, not all 10
+        jev_steps = [s for s in session.audit_trail if s["provider"] == "jev"]
+        assert len(jev_steps) == 3
+        # All 10 should appear in prefilter
+        prefilter_steps = [s for s in session.audit_trail if s["decision"] == "prefilter"]
+        assert len(prefilter_steps) == 10
+
+    @patch("reflex_search.scorers.httpx.post")
+    def test_two_pass_telemetry(self, mock_post, tmp_path):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.raise_for_status = MagicMock()
+        mock_resp.json.return_value = {
+            "answers": {"relevance": {"type": "noul", "noul": 0.85}},
+            "usage": {"input_tokens": 120, "cost": 0.00012},
+        }
+        mock_post.return_value = mock_resp
+
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        (repo / "auth.py").write_text("def require_auth(): pass", encoding="utf-8")
+        (repo / "math.py").write_text("def add(a, b): return a + b", encoding="utf-8")
+
+        from reflex_search.scorers import JevScorer
+
+        searcher = ReflexCodeSearcher(repo_root=str(repo), accept_threshold=0.3)
+        session = searcher.search_two_pass(
+            "auth",
+            jev_scorer=JevScorer(api_key="test-key"),
+            shortlist_size=2,
+        )
+
+        t = session.telemetry
+        assert t is not None
+        assert t.files_scanned > 0
+        assert t.total_cost > 0
+        assert t.total_tokens > 0

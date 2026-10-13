@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import json
+from dataclasses import asdict
 from pathlib import Path
 
 import typer
 from dotenv import load_dotenv
 
-from reflex_search.fallback import default_fallback_scorer
+from reflex_search.fallback import JevFallback, default_fallback_scorer
 from reflex_search.scorers import JevScorer, LocalScorer
 from reflex_search.searcher import ReflexCodeSearcher
 
@@ -24,14 +25,27 @@ def search(
     uncertain: float = typer.Option(0.40, "--uncertain", help="Uncertain threshold below which candidates are rejected."),
     min_margin: float = typer.Option(0.0, "--min-margin", help="Minimum score margin for accept (ported from tracecore-reflex)."),
     with_fallback: bool = typer.Option(False, "--with-fallback", help="Enable the default fallback scorer for uncertain candidates."),
-    live: bool = typer.Option(False, "--live", help="Use the Jev Decisions API for scoring (requires OPENROUTER_API_KEY)."),
+    smart_fallback: bool = typer.Option(False, "--smart-fallback", help="Use Jev API as fallback for uncertain candidates (requires OPENROUTER_API_KEY)."),
+    live: bool = typer.Option(False, "--live", help="Two-pass: LocalScorer pre-filters, Jev re-scores shortlist (requires OPENROUTER_API_KEY)."),
+    live_all: bool = typer.Option(False, "--live-all", help="Score every file with Jev (no pre-filter; requires OPENROUTER_API_KEY)."),
+    shortlist: int = typer.Option(20, "--shortlist", help="Number of files to shortlist for two-pass live mode."),
     verbose: bool = typer.Option(False, "--verbose", help="Print the full audit trail after results."),
+    stats: bool = typer.Option(False, "--stats", help="Print a one-line session telemetry summary."),
     json_output: bool = typer.Option(False, "--json", help="Emit JSON instead of plain text."),
 ) -> None:
     load_dotenv()
+
+    if with_fallback and smart_fallback:
+        typer.echo("Error: --with-fallback and --smart-fallback are mutually exclusive.", err=True)
+        raise typer.Exit(code=1)
+
     root = Path(repo_root).resolve()
-    scorer = JevScorer() if live else LocalScorer()
-    fallback = default_fallback_scorer if with_fallback else None
+    scorer = JevScorer() if live_all else LocalScorer()
+    fallback: object = None
+    if smart_fallback:
+        fallback = JevFallback()
+    elif with_fallback:
+        fallback = default_fallback_scorer
     searcher = ReflexCodeSearcher(
         repo_root=str(root),
         scorer=scorer,
@@ -41,7 +55,10 @@ def search(
         fallback=fallback,
         top_k=top_k,
     )
-    session = searcher.search(query=query)
+    if live:
+        session = searcher.search_two_pass(query=query, shortlist_size=shortlist)
+    else:
+        session = searcher.search(query=query)
 
     if json_output:
         payload = {
@@ -58,6 +75,7 @@ def search(
                 for r in session.results
             ],
             "audit_trail": session.audit_trail,
+            "telemetry": asdict(session.telemetry) if session.telemetry else None,
         }
         typer.echo(json.dumps(payload, indent=2))
         raise typer.Exit()
@@ -85,6 +103,15 @@ def search(
                 f"{entry['score']:.2f}  {entry['decision']:<9}  {entry['path']}"
             )
         typer.echo("")
+
+    if stats and session.telemetry:
+        t = session.telemetry
+        fb_part = f" | {t.fallback_calls} fallback" if t.fallback_calls else ""
+        typer.echo(
+            f"{t.files_scanned} files | {t.accepted} accepted | "
+            f"{t.uncertain} uncertain{fb_part} | {t.rejected} rejected | "
+            f"{t.total_latency_ms:.0f}ms | ${t.total_cost:.4f}"
+        )
 
 
 if __name__ == "__main__":

@@ -26,6 +26,13 @@ class ConfidenceGate:
         uncertain_threshold: float = 0.40,
         min_margin: float = 0.0,
     ) -> None:
+        values = (accept_threshold, uncertain_threshold, min_margin)
+        if any(not isinstance(value, (int, float)) or not math.isfinite(value) for value in values):
+            raise ValueError("gate thresholds and min_margin must be finite numbers")
+        if not 0.0 <= accept_threshold <= 1.0 or not 0.0 <= uncertain_threshold <= 1.0:
+            raise ValueError("thresholds must be between 0 and 1")
+        if not 0.0 <= min_margin <= 1.0:
+            raise ValueError("min_margin must be between 0 and 1")
         self.accept_threshold = accept_threshold
         self.uncertain_threshold = uncertain_threshold
         self.min_margin = min_margin

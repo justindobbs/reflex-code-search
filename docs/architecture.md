@@ -17,7 +17,7 @@ That is the same basic pattern as the REFLEX control loop: bounded decisions fir
 
 ## Components
 
-### 1. Candidate discovery (`ReflexCodeSearcher._collect_files`)
+### 1. Candidate discovery (`file_collector.collect_files`)
 
 The searcher scans a repo and collects candidate text files, excluding common noise such as:
 
@@ -39,11 +39,12 @@ The `Scorer` protocol (defined in `models.py`) allows plugging in any scorer. Tw
 
 #### `LocalScorer` (default, offline)
 
-A fast term-overlap heuristic with no API calls:
-
-- 30% weight: overlap between query terms and file path
-- 70% weight: overlap between query terms and file content (first 2000 chars)
-- both components normalized by the number of query terms
+A fast term-overlap heuristic with no API calls. It expands a bounded synonym
+map and combines path matches (25%), content matches in the first 8,000
+characters (35%), phrase matches (15%), definition-name matches (15%), and
+Python docstring matches (10%). Each component is normalized by query term
+count; original terms weigh more than expanded synonyms. Phrase matching
+normalizes hyphens and underscores, and treats “fall back” as “fallback.”
 
 #### `JevScorer` (live, requires API key)
 
@@ -61,16 +62,19 @@ The confidence gate makes a **three-way decision** for each candidate:
 | ≥ `uncertain_threshold` (default 0.40) | **uncertain** | Escalate to fallback if configured, otherwise skip |
 | < `uncertain_threshold` | **reject** | Skip immediately |
 
-The gate also includes two hardening features ported from tracecore-reflex:
+When `min_margin` is enabled, the searcher compares the highest candidate score
+with the runner-up. A close top result is downgraded to **uncertain**. The gate
+also rejects NaN, infinity, and non-numeric scores; finite scores outside [0, 1]
+are clamped.
 
-- **`min_margin`** — if the gap between the candidate's score and a runner-up is below this margin, the decision is downgraded from accept to uncertain (prevents false confidence in ambiguous results)
-- **Input validation** — NaN, infinity, non-numeric, and out-of-range scores are rejected gracefully
-
-### 4. Fallback path (`default_fallback_scorer`)
+### 4. Fallback path (`default_fallback_scorer`, `JevFallback`)
 
 When a candidate is **uncertain**, the searcher calls an optional fallback scorer. The fallback result is run through the same confidence gate.
 
-The built-in `default_fallback_scorer` uses simple term overlap. It is enabled via the `--with-fallback` CLI flag or by passing a callable to `ReflexCodeSearcher(fallback=...)`.
+The built-in `default_fallback_scorer` uses simple term overlap. `JevFallback`
+uses the Jev API and records call telemetry. They are enabled with
+`--with-fallback` and `--smart-fallback`, respectively, or by passing a callable
+to `ReflexCodeSearcher(fallback=...)`.
 
 The fallback is not a substitute for the main flow. It is only there to resolve edge cases.
 
@@ -84,13 +88,16 @@ Every search emits a compact audit trail. This includes:
 - path examined
 - decision (`accept`, `uncertain`, or `reject`)
 
-When using `JevScorer`, each entry also includes:
+When using `JevScorer` or `JevFallback`, entries also include:
 
 - `latency_ms` — round-trip time for the API call
 - `cost` — token cost from the Jev response
 - `input_tokens` — number of input tokens consumed
 
-This keeps the tool explainable and makes debugging easier. The `--verbose` CLI flag prints the full audit trail.
+This keeps the tool explainable and makes debugging easier. The `--verbose` CLI flag prints the full audit trail. Two-pass search records first-pass `prefilter` entries and second-pass Jev decisions; session decision counts exclude prefilter events, and `files_scanned` counts unique candidate paths.
+
+When fallback runs, the audit trail records both the original uncertain decision
+and the fallback decision, including telemetry for each scorer call.
 
 ## Relationship to tracecore-reflex
 

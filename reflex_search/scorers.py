@@ -161,8 +161,10 @@ class LocalScorer:
         bigram_score = 0.0
         if n >= 2:
             bigrams = [f"{query_terms[i]} {query_terms[i+1]}" for i in range(n - 1)]
-            path_bigram_hits = sum(1 for bg in bigrams if bg in path_text)
-            content_bigram_hits = sum(1 for bg in bigrams if bg in content_preview)
+            path_phrases = self._normalize_match_text(file_path)
+            content_phrases = self._normalize_match_text(content[:8000])
+            path_bigram_hits = sum(1 for bg in bigrams if bg in path_phrases)
+            content_bigram_hits = sum(1 for bg in bigrams if bg in content_phrases)
             nb = len(bigrams)
             bigram_score = 0.15 * ((path_bigram_hits + content_bigram_hits) / nb)
 
@@ -198,8 +200,15 @@ class LocalScorer:
 
     @staticmethod
     def _tokenize(value: str) -> list[str]:
-        parts = value.lower().replace("-", " ").replace("_", " ").split()
+        normalized = value.lower().replace("-", " ").replace("_", " ")
+        normalized = re.sub(r"\bfall\s+back\b", "fallback", normalized)
+        parts = normalized.split()
         return [_stem(p) for p in parts if p and p not in _STOPWORDS]
+
+    @staticmethod
+    def _normalize_match_text(value: str) -> str:
+        """Make common identifier and prose separators equivalent to spaces."""
+        return re.sub(r"[-_]+", " ", value.lower())
 
     @staticmethod
     def _expand_synonyms(terms: list[str]) -> list[str]:

@@ -1,6 +1,6 @@
 {
-  "version": "2.0",
-  "description": "Hand-labelled queries for benchmarking reflex-code-search recall.",
+  "version": "2.1",
+  "description": "Hand-labelled queries for benchmarking code search recall and ranking.",
   "suites": [
     {
       "name": "reflex-code-search",
@@ -134,6 +134,58 @@
           "expected_files": [
             "docs/architecture.md",
             "docs/release-spec.md"
+          ]
+        },
+        {
+          "query": "How does Jev scoring protect secrets before sending file contents?",
+          "expected_files": [
+            "reflex_search/scorers.py",
+            "tests/test_core.py"
+          ]
+        },
+        {
+          "query": "How does JevScorer fall back locally after an API error?",
+          "expected_files": [
+            "reflex_search/scorers.py"
+          ]
+        },
+        {
+          "query": "How does the file collector use nested .gitignore patterns?",
+          "expected_files": [
+            "reflex_search/file_collector.py",
+            "tests/test_file_collector.py"
+          ]
+        },
+        {
+          "query": "Where are session telemetry fields defined and calculated?",
+          "expected_files": [
+            "reflex_search/models.py",
+            "reflex_search/searcher.py"
+          ]
+        },
+        {
+          "query": "Where does the command line turn search results into JSON?",
+          "expected_files": [
+            "reflex_search/cli.py"
+          ]
+        },
+        {
+          "query": "What text suffixes are allowed and what file size is too large?",
+          "expected_files": [
+            "reflex_search/file_collector.py"
+          ]
+        },
+        {
+          "query": "When does the search loop escalate an uncertain score to its fallback?",
+          "expected_files": [
+            "reflex_search/searcher.py"
+          ]
+        },
+        {
+          "query": "How does the local ranking score Python module docstrings?",
+          "expected_files": [
+            "reflex_search/scorers.py",
+            "tests/test_core.py"
           ]
         }
       ]

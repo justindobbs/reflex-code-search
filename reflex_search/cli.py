@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import asdict
 from pathlib import Path
 
@@ -37,6 +38,27 @@ def search(
 
     if with_fallback and smart_fallback:
         typer.echo("Error: --with-fallback and --smart-fallback are mutually exclusive.", err=True)
+        raise typer.Exit(code=1)
+    if live and live_all:
+        typer.echo("Error: --live and --live-all select different scoring modes.", err=True)
+        raise typer.Exit(code=1)
+    if live and (with_fallback or smart_fallback):
+        typer.echo("Error: --live cannot be combined with fallback options.", err=True)
+        raise typer.Exit(code=1)
+    if live and shortlist < 1:
+        typer.echo("Error: --shortlist must be greater than zero.", err=True)
+        raise typer.Exit(code=1)
+    if top_k < 0:
+        typer.echo("Error: --top-k must be non-negative.", err=True)
+        raise typer.Exit(code=1)
+    if not all(math.isfinite(value) for value in (threshold, uncertain, min_margin)):
+        typer.echo("Error: thresholds and --min-margin must be finite numbers.", err=True)
+        raise typer.Exit(code=1)
+    if not 0.0 <= threshold <= 1.0 or not 0.0 <= uncertain <= 1.0:
+        typer.echo("Error: --threshold and --uncertain must be between 0 and 1.", err=True)
+        raise typer.Exit(code=1)
+    if not 0.0 <= min_margin <= 1.0:
+        typer.echo("Error: --min-margin must be between 0 and 1.", err=True)
         raise typer.Exit(code=1)
 
     root = Path(repo_root).resolve()

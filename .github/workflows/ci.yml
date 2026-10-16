@@ -20,3 +20,7 @@ jobs:
       - run: pip install -e ".[dev]"
       - run: ruff check reflex_search/ tests/ tools/bench.py
       - run: pytest tests/ -v
+      - run: pip install build
+      - run: python -m build
+      - run: pip install --no-deps --force-reinstall dist/*.whl
+      - run: reflex-search --help

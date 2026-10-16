@@ -67,6 +67,9 @@ Run Ruff to check code style and common issues:
 python -m ruff check .
 ```
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contributor setup, checks, and pull
+request guidance.
+
 ## Usage
 
 Basic search against the current directory:

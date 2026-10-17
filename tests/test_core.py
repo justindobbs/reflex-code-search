@@ -64,7 +64,7 @@ class TestLocalScorer:
         unrelated = scorer.score(
             "core.py",
             query,
-            "class Command:\n    formatter = TextFormatter()\n",
+            "class Command:\n    formatter = HelpFormatterX()\n",
         )
         assert usage_match > unrelated
 

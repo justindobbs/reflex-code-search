@@ -23,6 +23,12 @@ dist/
 
 # Local secrets / generated files
 .env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
 *.log
 .benchmark-repos/
 .benchmark-results/

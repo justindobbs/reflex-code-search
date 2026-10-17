@@ -176,6 +176,19 @@ class LocalScorer:
             def_hits = self._weighted_hits(expanded, originals, " ".join(def_names))
             def_score = 0.15 * (def_hits / n)
 
+        # Location/implementation questions benefit from matching query terms
+        # against declared symbols, which is stronger evidence than prose.
+        query_lower = query.lower()
+        asks_for_implementation = any(
+            marker in query_lower
+            for marker in ("where", "defined", "definition", "implement", "class", "function", "method")
+        )
+        if definitions and asks_for_implementation:
+            direct_definition_hits = sum(
+                1 for term in originals if any(term in name for name in def_names)
+            )
+            def_score += 0.20 * (direct_definition_hits / n)
+
         # --- Docstring boosting ---
         doc_score = 0.0
         doc_match = _DOCSTRING_RE.search(content[:8000])
@@ -200,7 +213,8 @@ class LocalScorer:
 
     @staticmethod
     def _tokenize(value: str) -> list[str]:
-        normalized = value.lower().replace("-", " ").replace("_", " ")
+        normalized = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", value)
+        normalized = normalized.lower().replace("-", " ").replace("_", " ")
         normalized = re.sub(r"\bfall\s+back\b", "fallback", normalized)
         parts = normalized.split()
         return [_stem(p) for p in parts if p and p not in _STOPWORDS]

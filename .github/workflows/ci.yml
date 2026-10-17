@@ -7,6 +7,21 @@ on:
     branches: [main]
 
 jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: pallets/click
+          ref: 8.5.0
+          path: .benchmark-repos/click
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install -e .
+      - run: python tools/bench.py
+
   test:
     runs-on: ubuntu-latest
     strategy:

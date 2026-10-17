@@ -35,6 +35,13 @@ and include relevant before-and-after results in the pull request:
 python tools/bench.py
 ```
 
+The benchmark includes the independent Click 8.5.0 suite. For local runs, place
+that checkout at `.benchmark-repos/click`:
+
+```bash
+git clone --depth 1 --branch 8.5.0 https://github.com/pallets/click.git .benchmark-repos/click
+```
+
 Live benchmarks call the Jev API and may incur cost. Use them only when the
 change needs live scoring results and an API key is configured.
 

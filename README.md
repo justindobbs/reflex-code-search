@@ -92,7 +92,6 @@ reflex-search "confidence gate" . --threshold 0.3
 ```
 [local] 1.00  reflex_search/gate.py
 [local] 0.76  docs/benchmarks.md
-[local] 0.76  docs/release-spec.md
 [local] 0.70  reflex_search/scorers.py
 [local] 0.68  README.md
 ```
@@ -106,7 +105,7 @@ reflex-search "How is scoring done?" . --verbose --threshold 0.3
 ```
 --- Audit Trail ---
   step   1  [local]  0.35  reject     CHANGELOG.md
-  step   2  [local]  0.35  reject     docs/release-spec.md
+  step   2  [local]  0.35  reject     docs/architecture.md
   step   3  [local]  0.26  reject     reflex_search/cli.py
   step   4  [local]  0.84  accept     reflex_search/scorers.py
   ...
@@ -261,8 +260,7 @@ tools/
 
 docs/
 ├── architecture.md    # design and component docs
-├── benchmarks.md      # benchmark results and jevgrep comparison
-└── release-spec.md    # release specification
+└── benchmarks.md      # benchmark results and jevgrep comparison
 ```
 
 ## License

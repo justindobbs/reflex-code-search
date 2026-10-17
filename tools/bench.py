@@ -126,6 +126,10 @@ def _format_markdown(
         "Recall@k, precision@k, and reciprocal rank are macro-averaged across "
         "queries; precision@k uses the requested k as its denominator.\n"
     )
+    lines.append(
+        "The independent Click suite uses upstream tag 8.5.0 and expects its "
+        "checkout at `.benchmark-repos/click`; CI checks it out automatically.\n"
+    )
 
     for label, results in all_results.items():
         lines.append(f"## {label}\n")

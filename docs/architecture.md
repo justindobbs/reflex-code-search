@@ -45,6 +45,8 @@ characters (35%), phrase matches (15%), definition-name matches (15%), and
 Python docstring matches (10%). Each component is normalized by query term
 count; original terms weigh more than expanded synonyms. Phrase matching
 normalizes hyphens and underscores, and treats “fall back” as “fallback.”
+Location and implementation queries also get a direct symbol-match boost of up
+to 20%, before the final score is capped at 1.0.
 
 #### `JevScorer` (live, requires API key)
 

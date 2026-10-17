@@ -1,5 +1,5 @@
 {
-  "version": "2.1",
+  "version": "2.2",
   "description": "Hand-labelled queries for benchmarking code search recall and ranking.",
   "suites": [
     {
@@ -132,8 +132,7 @@
         {
           "query": "How is the project architecture documented?",
           "expected_files": [
-            "docs/architecture.md",
-            "docs/release-spec.md"
+            "docs/architecture.md"
           ]
         },
         {
@@ -293,6 +292,63 @@
           "query": "What experiment checklist guides reproducible runs?",
           "expected_files": [
             "docs/experiment-checklist.md"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "click",
+      "repo_root": ".benchmark-repos/click",
+      "queries": [
+        {
+          "query": "How does Click parse command line arguments and option values?",
+          "expected_files": [
+            "src/click/parser.py",
+            "src/click/core.py"
+          ]
+        },
+        {
+          "query": "Where are Group and resolve_command implemented?",
+          "expected_files": [
+            "src/click/core.py"
+          ]
+        },
+        {
+          "query": "Where are the command, group, and option decorators defined?",
+          "expected_files": [
+            "src/click/decorators.py"
+          ]
+        },
+        {
+          "query": "Where is Click's HelpFormatter implemented and used?",
+          "expected_files": [
+            "src/click/formatting.py",
+            "src/click/core.py"
+          ]
+        },
+        {
+          "query": "How can tests run a command and capture its output without a subprocess?",
+          "expected_files": [
+            "src/click/testing.py"
+          ]
+        },
+        {
+          "query": "How are Click's Path and File parameter types defined?",
+          "expected_files": [
+            "src/click/types.py"
+          ]
+        },
+        {
+          "query": "How does Click generate shell-specific command completions?",
+          "expected_files": [
+            "src/click/shell_completion.py"
+          ]
+        },
+        {
+          "query": "Where are command usage errors represented and shown?",
+          "expected_files": [
+            "src/click/exceptions.py",
+            "src/click/core.py"
           ]
         }
       ]

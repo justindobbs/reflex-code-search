@@ -189,6 +189,34 @@ class LocalScorer:
             )
             def_score += 0.20 * (direct_definition_hits / n)
 
+            # Exact symbol names are stronger evidence than incidental word
+            # overlap, especially in large source files with many references.
+            query_identifiers = re.findall(r"\b[A-Za-z_]\w*\b", query)
+            specific_query_symbols = {
+                symbol.lower()
+                for symbol in query_identifiers
+                if "_" in symbol or re.search(r"[A-Z]", symbol[1:])
+            }
+            query_symbols = specific_query_symbols | {
+                symbol.lower()
+                for symbol in query_identifiers
+                if "decorator" in query_lower and symbol.lower() not in _STOPWORDS
+            }
+            # Large modules can declare the requested symbol beyond the text
+            # preview. Search all declarations only for explicit symbol queries.
+            declared_symbols = {
+                name.lower() for name in _DEFINITION_RE.findall(content)
+            }
+            exact_symbol_hits = len(query_symbols & declared_symbols)
+            def_score += min(0.50, 0.25 * exact_symbol_hits)
+
+            symbol_references = sum(
+                1
+                for symbol in specific_query_symbols
+                if re.search(rf"\b{re.escape(symbol)}\b", content_preview)
+            )
+            def_score += min(0.40, 0.20 * symbol_references)
+
         # --- Docstring boosting ---
         doc_score = 0.0
         doc_match = _DOCSTRING_RE.search(content[:8000])

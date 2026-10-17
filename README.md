@@ -72,6 +72,12 @@ request guidance.
 
 ## Usage
 
+Display the CLI options and descriptions:
+
+```bash
+reflex-search --help
+```
+
 Basic search against the current directory:
 
 ```bash

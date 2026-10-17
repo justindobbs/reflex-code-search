@@ -38,6 +38,36 @@ class TestLocalScorer:
         content_only = scorer.score("utils.py", "auth", "def require_auth(): pass")
         assert content_only > path_only
 
+    def test_exact_symbols_boost_implementation_matches(self):
+        scorer = LocalScorer()
+        query = "Where are Group and resolve_command implemented?"
+        exact_match = scorer.score(
+            "core.py",
+            query,
+            "class Group:\n    def resolve_command(self):\n        pass\n",
+        )
+        incidental_match = scorer.score(
+            "helpers.py",
+            query,
+            "def group_related_command():\n    return 'resolve command'\n",
+        )
+        assert exact_match > incidental_match
+
+    def test_exact_symbol_references_boost_implementation_usage(self):
+        scorer = LocalScorer()
+        query = "Where is HelpFormatter implemented and used?"
+        usage_match = scorer.score(
+            "core.py",
+            query,
+            "class Command:\n    formatter = HelpFormatter()\n",
+        )
+        unrelated = scorer.score(
+            "core.py",
+            query,
+            "class Command:\n    formatter = TextFormatter()\n",
+        )
+        assert usage_match > unrelated
+
     def test_multiterm_normalizes_by_count(self):
         scorer = LocalScorer()
         score = scorer.score("foo.py", "authentication middleware handler", "authentication check")

@@ -30,7 +30,7 @@ from the local search path.
   upstream Click 8.5.0 reproducible.
 - Use precision@k, reciprocal rank, and missed-file reports to target changes.
   Current local recall at top_k=5 and threshold=0.3 is 85% on this project,
-  94% on tracecore-reflex, and 69% on Click.
+  94% on tracecore-reflex, and 94% on Click.
 - Evaluate ranking changes across every suite and retain the deterministic,
   dependency-light local search path.
 

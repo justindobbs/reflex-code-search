@@ -161,8 +161,10 @@ class LocalScorer:
         bigram_score = 0.0
         if n >= 2:
             bigrams = [f"{query_terms[i]} {query_terms[i+1]}" for i in range(n - 1)]
-            path_bigram_hits = sum(1 for bg in bigrams if bg in path_text)
-            content_bigram_hits = sum(1 for bg in bigrams if bg in content_preview)
+            path_phrases = self._normalize_match_text(file_path)
+            content_phrases = self._normalize_match_text(content[:8000])
+            path_bigram_hits = sum(1 for bg in bigrams if bg in path_phrases)
+            content_bigram_hits = sum(1 for bg in bigrams if bg in content_phrases)
             nb = len(bigrams)
             bigram_score = 0.15 * ((path_bigram_hits + content_bigram_hits) / nb)
 
@@ -173,6 +175,19 @@ class LocalScorer:
             def_names = {d.lower() for d in definitions}
             def_hits = self._weighted_hits(expanded, originals, " ".join(def_names))
             def_score = 0.15 * (def_hits / n)
+
+        # Location/implementation questions benefit from matching query terms
+        # against declared symbols, which is stronger evidence than prose.
+        query_lower = query.lower()
+        asks_for_implementation = any(
+            marker in query_lower
+            for marker in ("where", "defined", "definition", "implement", "class", "function", "method")
+        )
+        if definitions and asks_for_implementation:
+            direct_definition_hits = sum(
+                1 for term in originals if any(term in name for name in def_names)
+            )
+            def_score += 0.20 * (direct_definition_hits / n)
 
         # --- Docstring boosting ---
         doc_score = 0.0
@@ -198,8 +213,16 @@ class LocalScorer:
 
     @staticmethod
     def _tokenize(value: str) -> list[str]:
-        parts = value.lower().replace("-", " ").replace("_", " ").split()
+        normalized = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", value)
+        normalized = normalized.lower().replace("-", " ").replace("_", " ")
+        normalized = re.sub(r"\bfall\s+back\b", "fallback", normalized)
+        parts = normalized.split()
         return [_stem(p) for p in parts if p and p not in _STOPWORDS]
+
+    @staticmethod
+    def _normalize_match_text(value: str) -> str:
+        """Make common identifier and prose separators equivalent to spaces."""
+        return re.sub(r"[-_]+", " ", value.lower())
 
     @staticmethod
     def _expand_synonyms(terms: list[str]) -> list[str]:

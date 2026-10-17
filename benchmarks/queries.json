@@ -1,6 +1,6 @@
 {
-  "version": "2.0",
-  "description": "Hand-labelled queries for benchmarking reflex-code-search recall.",
+  "version": "2.2",
+  "description": "Hand-labelled queries for benchmarking code search recall and ranking.",
   "suites": [
     {
       "name": "reflex-code-search",
@@ -132,8 +132,59 @@
         {
           "query": "How is the project architecture documented?",
           "expected_files": [
-            "docs/architecture.md",
-            "docs/release-spec.md"
+            "docs/architecture.md"
+          ]
+        },
+        {
+          "query": "How does Jev scoring protect secrets before sending file contents?",
+          "expected_files": [
+            "reflex_search/scorers.py",
+            "tests/test_core.py"
+          ]
+        },
+        {
+          "query": "How does JevScorer fall back locally after an API error?",
+          "expected_files": [
+            "reflex_search/scorers.py"
+          ]
+        },
+        {
+          "query": "How does the file collector use nested .gitignore patterns?",
+          "expected_files": [
+            "reflex_search/file_collector.py",
+            "tests/test_file_collector.py"
+          ]
+        },
+        {
+          "query": "Where are session telemetry fields defined and calculated?",
+          "expected_files": [
+            "reflex_search/models.py",
+            "reflex_search/searcher.py"
+          ]
+        },
+        {
+          "query": "Where does the command line turn search results into JSON?",
+          "expected_files": [
+            "reflex_search/cli.py"
+          ]
+        },
+        {
+          "query": "What text suffixes are allowed and what file size is too large?",
+          "expected_files": [
+            "reflex_search/file_collector.py"
+          ]
+        },
+        {
+          "query": "When does the search loop escalate an uncertain score to its fallback?",
+          "expected_files": [
+            "reflex_search/searcher.py"
+          ]
+        },
+        {
+          "query": "How does the local ranking score Python module docstrings?",
+          "expected_files": [
+            "reflex_search/scorers.py",
+            "tests/test_core.py"
           ]
         }
       ]
@@ -241,6 +292,63 @@
           "query": "What experiment checklist guides reproducible runs?",
           "expected_files": [
             "docs/experiment-checklist.md"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "click",
+      "repo_root": ".benchmark-repos/click",
+      "queries": [
+        {
+          "query": "How does Click parse command line arguments and option values?",
+          "expected_files": [
+            "src/click/parser.py",
+            "src/click/core.py"
+          ]
+        },
+        {
+          "query": "Where are Group and resolve_command implemented?",
+          "expected_files": [
+            "src/click/core.py"
+          ]
+        },
+        {
+          "query": "Where are the command, group, and option decorators defined?",
+          "expected_files": [
+            "src/click/decorators.py"
+          ]
+        },
+        {
+          "query": "Where is Click's HelpFormatter implemented and used?",
+          "expected_files": [
+            "src/click/formatting.py",
+            "src/click/core.py"
+          ]
+        },
+        {
+          "query": "How can tests run a command and capture its output without a subprocess?",
+          "expected_files": [
+            "src/click/testing.py"
+          ]
+        },
+        {
+          "query": "How are Click's Path and File parameter types defined?",
+          "expected_files": [
+            "src/click/types.py"
+          ]
+        },
+        {
+          "query": "How does Click generate shell-specific command completions?",
+          "expected_files": [
+            "src/click/shell_completion.py"
+          ]
+        },
+        {
+          "query": "Where are command usage errors represented and shown?",
+          "expected_files": [
+            "src/click/exceptions.py",
+            "src/click/core.py"
           ]
         }
       ]

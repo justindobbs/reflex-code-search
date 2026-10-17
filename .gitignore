@@ -24,6 +24,8 @@ dist/
 # Local secrets / generated files
 .env
 *.log
+.benchmark-repos/
+.benchmark-results/
 
 # Internal development plan (not committed)
 docs/development-plan.md

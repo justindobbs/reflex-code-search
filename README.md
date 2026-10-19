@@ -10,7 +10,7 @@
 A small, focused implementation of semantic code search using a REFLEX-style control loop:
 
 - fast local relevance scoring with bigram matching and definition boosting (offline by default)
-- optional live scoring via the [Jev Decisions API](https://openrouter.ai/api/alpha/decisions)
+- optional live scoring via the [Jev Decisions API](https://openrouter.ai/docs/guides/community/jev)
 - three-way confidence gate (accept / uncertain / reject) with margin check
 - optional fallback scorer for uncertain matches
 - small, auditable search sessions with per-step telemetry

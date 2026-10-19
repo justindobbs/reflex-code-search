@@ -19,21 +19,15 @@ A small, focused implementation of semantic code search using a REFLEX-style con
 
 This project is intentionally narrow. It is not a broad coding-agent runtime, IDE, or repo management platform. It is a minimal primitive: given a natural-language question, find the files most likely to be relevant.
 
-## Project landing page
-
-The static landing page is in [`site/index.html`](site/index.html). Preview the deployable site locally with:
-
-```bash
-python -m http.server 8000 --directory site
-```
-
-Then open `http://localhost:8000`. Netlify publishes this directory using [`netlify.toml`](netlify.toml); the page has no build step or JavaScript dependencies.
-
 ## Why this exists
 
-Use a fast relevance model to narrow the search space before expensive reasoning. Many implementations end up becoming much larger and more complicated than the core need.
+Coding agents and developer tools regularly need to answer "which files matter for this question?" before they can do anything useful. The common approaches each have a gap:
 
-This project keeps the same idea while staying smaller and easier to reason about:
+- **Grep and ripgrep** find exact tokens but miss semantic intent — a query about "how authentication works" won't match a file that calls its function `verify_session`.
+- **Embedding-based search** requires an index, a vector store, and ongoing sync with the repo. That's a lot of infrastructure for a question that should take milliseconds.
+- **Sending the whole repo to a large model** works until the repo is too big, too expensive, or too slow — and it's hard to audit which files the model actually considered.
+
+reflex-code-search sits in the gap: use a fast relevance model to narrow the search space before expensive reasoning, without the infrastructure overhead. The approach stays small and easy to reason about:
 
 1. collect candidate files from a repo
 2. score them with a fast local heuristic — or the Jev API via `--live`

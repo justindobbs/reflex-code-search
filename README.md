@@ -1,5 +1,7 @@
 # reflex-code-search
 
+**Project site:** [reflex-code-search.netlify.app](https://reflex-code-search.netlify.app/)
+
 [![CI](https://github.com/justindobbs/reflex-code-search/actions/workflows/ci.yml/badge.svg)](https://github.com/justindobbs/reflex-code-search/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/downloads/)
@@ -16,6 +18,16 @@ A small, focused implementation of semantic code search using a REFLEX-style con
 - CLI-first design for local repository discovery
 
 This project is intentionally narrow. It is not a broad coding-agent runtime, IDE, or repo management platform. It is a minimal primitive: given a natural-language question, find the files most likely to be relevant.
+
+## Project landing page
+
+The static landing page is in [`site/index.html`](site/index.html). Preview the deployable site locally with:
+
+```bash
+python -m http.server 8000 --directory site
+```
+
+Then open `http://localhost:8000`. Netlify publishes this directory using [`netlify.toml`](netlify.toml); the page has no build step or JavaScript dependencies.
 
 ## Why this exists
 
@@ -148,7 +160,7 @@ reflex-search "How does the search loop work?" . --live --verbose
 | `--top-k` | 5 | Maximum number of files to return |
 | `--threshold` | 0.65 | Accept threshold for the confidence gate |
 | `--uncertain` | 0.40 | Uncertain threshold below which candidates are rejected |
-| `--min-margin` | 0.0 | Minimum score margin for accept (ported from tracecore-reflex) |
+| `--min-margin` | 0.0 | Minimum score margin required for an accept decision |
 | `--with-fallback` | off | Enable the default fallback scorer |
 | `--smart-fallback` | off | Use Jev API as fallback for uncertain candidates (mutually exclusive with `--with-fallback`) |
 | `--live` | off | Two-pass: LocalScorer pre-filters, Jev re-scores shortlist |

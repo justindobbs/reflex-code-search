@@ -35,3 +35,6 @@ dist/
 
 # Internal development plan (not committed)
 docs/development-plan.md
+
+# Netlify CLI local state
+.netlify/

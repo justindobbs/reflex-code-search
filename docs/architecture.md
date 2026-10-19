@@ -50,7 +50,7 @@ to 20%, before the final score is capped at 1.0.
 
 #### `JevScorer` (live, requires API key)
 
-Calls the [Jev Decisions API](https://openrouter.ai/api/alpha/decisions) via OpenRouter using the **noul** primitive — a calibrated yes/no probability that judges whether a file contains the implementation answering the query. Documentation and changelogs that merely mention a topic are deprioritized. This is the same API used by [tracecore-reflex](https://github.com/justindobbs/tracecore-reflex) and [jevgrep](https://jevgrep.com/), called directly with `httpx` — no dependency on either package.
+Calls the [Jev Decisions API](https://openrouter.ai/api/alpha/decisions) via OpenRouter using the **noul** primitive — a calibrated yes/no probability that judges whether a file contains the implementation answering the query. Documentation and changelogs that merely mention a topic are deprioritized. The API is called directly with `httpx`; there is no runtime dependency on an agent framework or another code-search package.
 
 On API errors, HTTP 401 (bad key), or HTTP 429 (rate limited), `JevScorer` falls back to `LocalScorer` automatically with a log warning. Each call records `latency_ms`, `cost`, and `input_tokens` for the audit trail. A `state_redactor` callback strips lines matching common secret patterns before content is sent to the API.
 
@@ -103,13 +103,13 @@ and the fallback decision, including telemetry for each scorer call.
 
 ## Relationship to tracecore-reflex
 
-This project borrows proven design patterns from tracecore-reflex:
+This project borrows design patterns from [tracecore-reflex](https://github.com/justindobbs/tracecore-reflex):
 
 - the Jev API call structure and endpoint
 - the margin-based confidence gate
 - per-step telemetry fields (latency, cost, tokens)
 
-It does **not** import or depend on tracecore-reflex at runtime. tracecore-reflex is an agent runtime for multi-step TraceCore tasks; this project is a single-shot file ranker. The useful ideas were ported directly (~60 lines of new code) to keep the projects decoupled.
+It does **not** import or depend on tracecore-reflex at runtime. tracecore-reflex is an agent runtime for multi-step TraceCore tasks; this project is a single-shot file ranker. The useful ideas were ported directly to keep the projects decoupled.
 
 ## Why this stays small
 

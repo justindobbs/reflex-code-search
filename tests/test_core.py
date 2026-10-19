@@ -68,6 +68,31 @@ class TestLocalScorer:
         )
         assert usage_match > unrelated
 
+    def test_config_key_matching_finds_model_and_threshold_settings(self):
+        scorer = LocalScorer()
+        config_score = scorer.score(
+            "reflex.toml",
+            "Where are jev_model, fallback_model, threshold, and min_margin configured?",
+            "[agent]\njev_model = 'jev'\nfallback_model = 'local'\nthreshold = 0.5\nmin_margin = 0.0\n",
+        )
+        reference_score = scorer.score(
+            "agent.py",
+            "Where are jev_model, fallback_model, threshold, and min_margin configured?",
+            "jev_model = 'jev'\nfallback_model = 'local'\nthreshold = 0.5\nmin_margin = 0.0\n",
+        )
+        assert config_score >= 0.9
+        assert config_score > reference_score
+
+    def test_enum_outcomes_boost_matching_gate_model(self):
+        scorer = LocalScorer()
+        query = "How does the confidence gate decide whether to accept or reject?"
+        content = """class GateDecision(Enum):
+    ACCEPT = 'accept'
+    UNCERTAIN = 'uncertain'
+    REJECT = 'reject'
+"""
+        assert scorer.score("models.py", query, content) >= 0.4
+
     def test_multiterm_normalizes_by_count(self):
         scorer = LocalScorer()
         score = scorer.score("foo.py", "authentication middleware handler", "authentication check")
@@ -75,6 +100,9 @@ class TestLocalScorer:
 
     def test_provider_attribute(self):
         assert LocalScorer.provider == "local"
+
+    def test_tokenize_strips_punctuation_and_possessives(self):
+        assert LocalScorer._tokenize("reject? model's foo/bar") == ["reject", "model", "foo", "bar"]
 
     def test_synonym_expansion_adds_related_terms(self):
         scorer = LocalScorer()
@@ -96,7 +124,7 @@ class TestLocalScorer:
 
     def test_synonym_expansion_improves_conceptual_query(self):
         scorer = LocalScorer()
-        # "collected" contains "collect" which expands to walk/scan/discover/find
+        # "collected" stems to "collect", which expands to walk/scan/discover/find
         # file_collector.py's content uses "walk" and "scan" concepts
         content = '"""File discovery for repository scanning."""\ndef collect_files(repo_root):\n    pass\n'
         score_with_synonyms = scorer.score("file_collector.py", "How are files collected", content)

@@ -1,5 +1,5 @@
 {
-  "version": "2.2",
+  "version": "2.3",
   "description": "Hand-labelled queries for benchmarking code search recall and ranking.",
   "suites": [
     {
@@ -245,8 +245,7 @@
         {
           "query": "How are action arguments resolved from a Jev response?",
           "expected_files": [
-            "reflex_agent/arg_resolver.py",
-            "tests/test_arg_resolver.py"
+            "reflex_agent/arg_resolver.py"
           ]
         },
         {
@@ -282,10 +281,9 @@
           ]
         },
         {
-          "query": "Where is the project configuration for model names and gate settings?",
+          "query": "Where are jev_model, fallback_model, threshold, and min_margin configured?",
           "expected_files": [
-            "reflex.toml",
-            "pyproject.toml"
+            "reflex.toml"
           ]
         },
         {

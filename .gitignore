@@ -23,9 +23,18 @@ dist/
 
 # Local secrets / generated files
 .env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
 *.log
 .benchmark-repos/
 .benchmark-results/
 
 # Internal development plan (not committed)
 docs/development-plan.md
+
+# Netlify CLI local state
+.netlify/

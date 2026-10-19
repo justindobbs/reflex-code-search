@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Documentation
+
+- Add landing-page use cases and an illustrative search-flow visual.
+- Add a security policy covering vulnerability reporting and optional live-scoring data handling.
+
 ## 0.1.0 — 2026-10-03
 
 Initial release.

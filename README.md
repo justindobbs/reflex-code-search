@@ -82,6 +82,9 @@ python -m ruff check .
 See [CONTRIBUTING.md](CONTRIBUTING.md) for contributor setup, checks, and pull
 request guidance.
 
+For vulnerability reporting and details about data sent during optional live
+scoring, see [SECURITY.md](SECURITY.md).
+
 ## Usage
 
 Display the CLI options and descriptions:

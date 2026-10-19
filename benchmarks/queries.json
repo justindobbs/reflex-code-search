@@ -350,6 +350,63 @@
           ]
         }
       ]
+    },
+    {
+      "name": "httpx",
+      "repo_root": ".benchmark-repos/httpx",
+      "queries": [
+        {
+          "query": "How does httpx follow redirects?",
+          "expected_files": [
+            "httpx/_client.py"
+          ]
+        },
+        {
+          "query": "Where are the Request and Response classes defined?",
+          "expected_files": [
+            "httpx/_models.py"
+          ]
+        },
+        {
+          "query": "How does authentication work in httpx?",
+          "expected_files": [
+            "httpx/_auth.py"
+          ]
+        },
+        {
+          "query": "Where is the async HTTP client implemented?",
+          "expected_files": [
+            "httpx/_client.py"
+          ]
+        },
+        {
+          "query": "How does httpx handle streaming responses?",
+          "expected_files": [
+            "httpx/_models.py",
+            "httpx/_client.py"
+          ]
+        },
+        {
+          "query": "Where is URL parsing and manipulation implemented?",
+          "expected_files": [
+            "httpx/_urls.py",
+            "httpx/_urlparse.py"
+          ]
+        },
+        {
+          "query": "How does the transport layer send requests?",
+          "expected_files": [
+            "httpx/_transports/base.py",
+            "httpx/_transports/default.py"
+          ]
+        },
+        {
+          "query": "Where is the exception hierarchy defined?",
+          "expected_files": [
+            "httpx/_exceptions.py"
+          ]
+        }
+      ]
     }
   ]
 }

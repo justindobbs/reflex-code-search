@@ -79,6 +79,23 @@ request guidance.
 For vulnerability reporting and details about data sent during optional live
 scoring, see [SECURITY.md](SECURITY.md).
 
+## Benchmarks
+
+The benchmark harness scores queries against this repo, `tracecore-reflex` (expected at `../tracecore-reflex`), and two third-party repos. The third-party checkouts live in `.benchmark-repos/` which is gitignored, so clone them before running benchmarks locally:
+
+```bash
+git clone --depth 1 --branch 8.5.0 https://github.com/pallets/click.git .benchmark-repos/click
+git clone --depth 1 --branch 0.28.1 https://github.com/encode/httpx.git .benchmark-repos/httpx
+```
+
+Then run the harness:
+
+```bash
+python tools/bench.py
+```
+
+CI checks out both repos automatically. Results are in [docs/benchmarks.md](docs/benchmarks.md).
+
 ## Usage
 
 Display the CLI options and descriptions:
@@ -268,7 +285,7 @@ tests/
 └── test_cli.py        # CLI integration tests
 
 benchmarks/
-└── queries.json       # hand-labelled dataset (18 queries, 2 repos)
+└── queries.json       # hand-labelled dataset (4 repos, 60 queries)
 
 tools/
 └── bench.py           # benchmark harness (recall@k, latency, cost)

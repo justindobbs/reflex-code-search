@@ -16,6 +16,11 @@ jobs:
           repository: pallets/click
           ref: 8.5.0
           path: .benchmark-repos/click
+      - uses: actions/checkout@v4
+        with:
+          repository: encode/httpx
+          ref: 0.28.1
+          path: .benchmark-repos/httpx
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"

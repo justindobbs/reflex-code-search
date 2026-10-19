@@ -212,7 +212,7 @@ class LocalScorer:
             specific_query_symbols = {
                 symbol.lower()
                 for symbol in query_identifiers
-                if "_" in symbol or re.search(r"[A-Z]", symbol[1:])
+                if "_" in symbol or symbol[0].isupper() or re.search(r"[A-Z]", symbol[1:])
             }
             query_symbols = specific_query_symbols | {
                 symbol.lower()

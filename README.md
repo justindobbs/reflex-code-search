@@ -183,6 +183,7 @@ reflex-search "How does the search loop work?" . --live --verbose
 | `--verbose` | off | Print the full audit trail after results |
 | `--stats` | off | Print a one-line session telemetry summary |
 | `--json` | off | Emit JSON instead of plain text (includes telemetry block) |
+| `--async` | off | Use async parallel scoring for `--live` and `--smart-fallback` modes |
 
 ## Example output
 
@@ -235,6 +236,18 @@ searcher = ReflexCodeSearcher(scorer=JevScorer())
 session = searcher.search("Where are migrations defined?")
 ```
 
+Async parallel scoring (smart-fallback with concurrency limit):
+
+```python
+import asyncio
+from reflex_search import AsyncJevScorer, ReflexCodeSearcher
+
+searcher = ReflexCodeSearcher(repo_root=".", accept_threshold=0.30, uncertain_threshold=0.10)
+session = asyncio.run(
+    searcher.async_search("Where are migrations defined?", concurrency=10)
+)
+```
+
 A custom scorer can be plugged in via the `Scorer` protocol:
 
 ```python
@@ -265,34 +278,67 @@ Without a key, `JevScorer` falls back to `LocalScorer` automatically.
 
 This project borrows design patterns from [tracecore-reflex](https://github.com/justindobbs/tracecore-reflex) — the confidence gate margin check, Jev API integration approach, and per-step telemetry — but does **not** depend on it at runtime. tracecore-reflex is an agent runtime for TraceCore tasks; this project is a narrow code-search primitive.
 
+## Agent integration
+
+### Agent Skills (zero dependencies)
+
+The `skills/code-search/SKILL.md` file tells any compatible agent (Windsurf, Claude Code, etc.) how to invoke reflex-search via the CLI. No SDK or server process needed — agents read the skill file and run the CLI directly.
+
+### MCP server (optional dependency)
+
+For agents that speak the [Model Context Protocol](https://modelcontextprotocol.io/), reflex-code-search exposes a `search_codebase` tool:
+
+```bash
+# Install with MCP support
+pip install -e ".[mcp]"
+
+# Run the MCP server (stdio transport)
+reflex-search-mcp
+# or
+python -m reflex_search.mcp_server
+```
+
+The tool accepts `query`, `repo_root`, `top_k`, `threshold`, `live`, and `smart_fallback` parameters and returns structured JSON matching the `SearchSession` shape.
+
 ## Project structure
 
 ```text
 reflex_search/
 ├── __init__.py        # public exports
 ├── __main__.py        # python -m reflex_search entrypoint
+├── ast_extract.py     # AST-based Python metadata extraction
 ├── cli.py             # typer CLI
 ├── core.py            # backward-compatible re-exports
 ├── fallback.py        # default fallback scorer
 ├── file_collector.py  # repo file discovery and exclusions
 ├── gate.py            # three-way confidence gate
+├── mcp_server.py      # MCP tool server (optional mcp dependency)
 ├── models.py          # data classes, Scorer protocol
-├── scorers.py         # LocalScorer, JevScorer
-└── searcher.py        # REFLEX search loop orchestrator
+├── scorers.py         # LocalScorer, JevScorer, AsyncJevScorer
+└── searcher.py        # REFLEX search loop orchestrator (sync + async)
+
+skills/
+└── code-search/
+    └── SKILL.md       # Agent Skills definition for CLI invocation
 
 tests/
+├── test_ast_extract.py # AST extractor tests
+├── test_async.py      # async scorer and search tests
+├── test_cli.py        # CLI integration tests
 ├── test_core.py       # unit tests for scorer, gate, searcher
-└── test_cli.py        # CLI integration tests
+├── test_file_collector.py # file collector tests
+└── test_mcp.py        # MCP server tests
 
 benchmarks/
 └── queries.json       # hand-labelled dataset (4 repos, 60 queries)
 
 tools/
-└── bench.py           # benchmark harness (recall@k, latency, cost)
+├── bench.py           # benchmark harness (recall@k, latency, cost)
+└── precision_analysis.py # false-accept analysis tool
 
 docs/
 ├── architecture.md    # design and component docs
-└── benchmarks.md      # benchmark results and jevgrep comparison
+└── benchmarks.md      # benchmark results
 ```
 
 ## License

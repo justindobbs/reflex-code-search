@@ -1,8 +1,6 @@
 # reflex-code-search Roadmap
 
-**Status:** Working direction, without delivery dates. Public release is under
-consideration; this roadmap does not imply that repository visibility has
-changed.
+**Status:** Working direction, without delivery dates.
 
 ## Product direction
 
@@ -11,50 +9,77 @@ files in a codebase. Improve retrieval quality and make results predictable,
 explainable, and easy to evaluate. Keep the optional Jev integration separate
 from the local search path.
 
-## Priorities
+## Current baseline
 
-### 1. Prepare the project for possible public use
+- 60 queries across 4 repos (reflex-code-search, tracecore-reflex, Click 8.5.0, httpx 0.28.1).
+- LocalScorer: 98–100% recall on 3 repos, 88% on httpx. Jev closes remaining httpx gaps.
+- Precision@k averages 24–29%.
+- AST-based definition/docstring extraction for Python files (Phase 3).
+- AsyncJevScorer with `asyncio.gather` and configurable concurrency (Phase 4).
+- Agent Skills file and optional MCP server (Phase 5).
+- 110 tests (105 passing, 5 skipped without optional mcp dependency), ruff clean.
 
-- Keep setup, supported Python versions, CLI examples, and development checks
-  accurate across the README, contributing guide, and CI.
-- Make the project scope, current limitations, and benchmark methodology clear
-  to someone encountering the repository for the first time.
-- Review repository metadata, tracked files, and Git history for anything that
-  should not be published; confirm licensing and contribution guidance are
-  clear before changing visibility.
-- Decide on a simple issue and release process if the project is made public.
+## Phases
 
-### 2. Improve retrieval using measured results
+### 1. Measure Jev vs Local head-to-head
 
-- Keep the benchmark suites for this project, tracecore-reflex, and pinned
-  upstream Click 8.5.0 reproducible.
-- Use precision@k, reciprocal rank, and missed-file reports to target changes.
-  Current local recall at top_k=5 and threshold=0.3 is 100% on this project,
-  tracecore-reflex, and Click.
-- Evaluate ranking changes across every suite and retain the deterministic,
-  dependency-light local search path.
+Show whether the REFLEX loop adds value beyond confirming local decisions.
 
-### 3. Keep installation and maintenance dependable
+- Add `--smart-fallback` mode to `bench.py` (Local scorer + Jev fallback for uncertain candidates).
+- Record per-query: recall delta, MRR delta, fallback call count, cost, latency.
+- Add fallback columns to `docs/benchmarks.md` alongside local results.
+- Focus on httpx suite first (known gaps), then all suites.
 
-- Maintain CI coverage for supported Python versions, tests, lint, wheel build,
-  and an installed-CLI smoke check.
-- Keep release notes, architecture documentation, and benchmark results aligned
-  with shipped behavior.
-- Document optional live scoring requirements and costs without making them a
-  prerequisite for local use.
+**Exit evidence:** Side-by-side numbers showing where smart-fallback improves recall and ranking, and what it costs.
 
-## Current capabilities
+### 2. Improve precision
 
-- Offline `LocalScorer` with synonym expansion, docstring and definition
-  matching, and phrase scoring.
-- Optional Jev scoring, uncertain-case fallback, and two-pass live search.
-- Three-way confidence gate, audit trail, and per-search telemetry.
-- Repository discovery with nested `.gitignore` support.
-- CLI and library interfaces, with tests and Python 3.11–3.13 CI.
+Reduce noise in the top-k so results are usable as agent context.
 
-## Out of scope
+- Analyze false accepts: categorize by cause (common term overlap, synonym over-expansion, doc/test file leakage).
+- Tighten scoring for common over-scorers: stronger demotion for test and doc files when queries ask about implementation.
+- Consider dynamic top-k cutoff based on score gap from the top result.
+- Add precision tracking to benchmark CI output.
 
-- Symbolic code graphs or tree-sitter parsing.
-- IDE integration or a repository hosting platform.
-- A broad plugin system beyond the existing `Scorer` protocol.
-- Runtime dependency on tracecore-reflex.
+**Exit evidence:** Precision@5 improves from ~27% toward 40%+ without recall regression.
+
+### 3. Language-aware file understanding ✅
+
+Replace heuristic branches with lightweight AST extraction.
+
+- ✅ Python first: use the `ast` module to extract class names, function signatures, docstrings, and imports (no new dependency).
+- ✅ Replace `_DEFINITION_RE` and `_DOCSTRING_RE` regex for `.py` files with the AST pass; keep regex fallback for non-Python files.
+- Evaluate tree-sitter as an optional dependency for multi-language support.
+
+**Exit evidence:** Benchmarks confirmed no recall regression (98%/100% unchanged). New `ast_extract.py` module with full test coverage.
+
+### 4. Async / parallel scoring ✅
+
+Cut live-mode latency for the two-pass shortlist.
+
+- ✅ Add `AsyncJevScorer` implementing an async scorer variant.
+- ✅ Add `async_search` and `async_search_two_pass` to `ReflexCodeSearcher` using `asyncio.gather`.
+- ✅ Keep sync paths unchanged; add `--async` flag to CLI for live modes.
+
+**Exit evidence:** `AsyncJevScorer`, `async_search`, `async_search_two_pass` with configurable `Semaphore(concurrency)`. CLI `--async` flag wired for `--live` and `--smart-fallback`. 14 async tests passing.
+
+### 5. MCP / tool integration ✅
+
+Expose the library as an MCP tool for agents.
+
+- ✅ Agent Skills file at `skills/code-search/SKILL.md` (zero-dependency agent integration).
+- ✅ Define a `search_codebase` MCP tool (query, repo_root, top_k, threshold, live, smart_fallback).
+- ✅ Return structured results matching the existing `SearchSession` shape.
+- ✅ Package as optional MCP server entry point (`reflex-search-mcp`); `mcp[cli]>=1.0` as optional dependency.
+
+**Exit evidence:** MCP server runs via stdio transport. Import guard raises clear `ImportError` without the optional dep. 6 MCP tests (1 passes without mcp, 5 run when mcp is installed).
+
+## Sequencing
+
+Phases 1–5 are complete. Future work is tracked below.
+
+## Ongoing
+
+- Keep setup, CI, and documentation accurate.
+- Evaluate ranking changes across every suite before merging.
+- Document optional live scoring requirements and costs without making them a prerequisite for local use.

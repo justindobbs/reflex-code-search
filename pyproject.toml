@@ -23,12 +23,19 @@ dev = [
     "respx>=0.21",
     "ruff>=0.16",
 ]
+mcp = [
+    "mcp[cli]>=1.0",
+]
 
 [project.scripts]
 reflex-search = "reflex_search.cli:app"
+reflex-search-mcp = "reflex_search.mcp_server:main"
 
 [tool.setuptools]
 packages = ["reflex_search"]
+
+[tool.ruff.lint.per-file-ignores]
+"tools/bench.py" = ["E402"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

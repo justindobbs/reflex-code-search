@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import math
 from dataclasses import asdict
@@ -11,7 +12,7 @@ import typer
 from dotenv import load_dotenv
 
 from reflex_search.fallback import JevFallback, default_fallback_scorer
-from reflex_search.scorers import JevScorer, LocalScorer
+from reflex_search.scorers import AsyncJevScorer, JevScorer, LocalScorer
 from reflex_search.searcher import ReflexCodeSearcher
 
 app = typer.Typer(help="Search repository files with a lightweight REFLEX-style loop.")
@@ -33,6 +34,7 @@ def search(
     verbose: bool = typer.Option(False, "--verbose", help="Print the full audit trail after results."),
     stats: bool = typer.Option(False, "--stats", help="Print a one-line session telemetry summary."),
     json_output: bool = typer.Option(False, "--json", help="Emit JSON instead of plain text."),
+    use_async: bool = typer.Option(False, "--async", help="Use async parallel scoring for --live and --smart-fallback modes."),
 ) -> None:
     load_dotenv()
 
@@ -44,6 +46,9 @@ def search(
         raise typer.Exit(code=1)
     if live and (with_fallback or smart_fallback):
         typer.echo("Error: --live cannot be combined with fallback options.", err=True)
+        raise typer.Exit(code=1)
+    if use_async and not (live or smart_fallback):
+        typer.echo("Error: --async requires --live or --smart-fallback.", err=True)
         raise typer.Exit(code=1)
     if live and shortlist < 1:
         typer.echo("Error: --shortlist must be greater than zero.", err=True)
@@ -77,8 +82,23 @@ def search(
         fallback=fallback,
         top_k=top_k,
     )
-    if live:
+    if live and use_async:
+        session = asyncio.run(
+            searcher.async_search_two_pass(
+                query=query,
+                async_scorer=AsyncJevScorer(),
+                shortlist_size=shortlist,
+            )
+        )
+    elif live:
         session = searcher.search_two_pass(query=query, shortlist_size=shortlist)
+    elif smart_fallback and use_async:
+        session = asyncio.run(
+            searcher.async_search(
+                query=query,
+                async_scorer=AsyncJevScorer(),
+            )
+        )
     else:
         session = searcher.search(query=query)
 

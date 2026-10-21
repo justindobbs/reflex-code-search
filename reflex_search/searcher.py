@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import ast
 import asyncio
 import os
+import re
 from collections.abc import Callable
 from typing import Any
 
@@ -22,6 +24,14 @@ from reflex_search.scorers import AsyncJevScorer, JevScorer, LocalScorer
 
 class ReflexCodeSearcher:
     """Minimal semantic code search using a REFLEX-style loop."""
+
+    _DEFINITION_LINE_RE = re.compile(
+        r"^\s*(?:async\s+)?(?:def|class|function|func|fn|const|let|var|type|"
+        r"interface|struct|enum)\s+[\w$]+"
+    )
+    _EXCERPT_GENERIC_TERMS = frozenset(
+        {"implement", "define", "work", "method", "function", "class", "file", "code"}
+    )
 
     def __init__(
         self,
@@ -321,23 +331,105 @@ class ReflexCodeSearcher:
 
     @staticmethod
     def _excerpt(content: str, query: str) -> str:
-        query_terms = [t.lower() for t in query.replace("-", " ").split() if t]
         lines = content.splitlines()
-        matches: list[str] = []
+        query_terms = set(LocalScorer._tokenize(query))
+        query_terms.difference_update(ReflexCodeSearcher._EXCERPT_GENERIC_TERMS)
+        best_index: int | None = None
+        best_score = 0
 
-        for line in lines:
-            lowered = line.lower()
-            if any(term in lowered for term in query_terms):
-                matches.append(line.strip())
-                if len(matches) >= 3:
-                    break
+        for index, line in enumerate(lines):
+            stripped = line.strip()
+            if not stripped or stripped.startswith(("import ", "from ", "#", "//", "/*", "*", "<!--")):
+                continue
 
-        if not matches:
-            excerpt = "\n".join(lines[:3])
-        else:
-            excerpt = "\n".join(matches)
+            line_terms = set(LocalScorer._tokenize(line))
+            overlap = len(query_terms & line_terms)
+            if not overlap:
+                continue
 
-        return excerpt[:400]
+            # Prefer declaration lines when they contain query terms. Exact
+            # token matching avoids treating e.g. "asyncio" as "async".
+            score = overlap + int(bool(ReflexCodeSearcher._DEFINITION_LINE_RE.match(line)))
+            if score > best_score:
+                best_index = index
+                best_score = score
+
+        if best_index is None:
+            # A query may describe behavior without using words present in the
+            # source. In that case, show a declaration instead of imports.
+            best_index = next(
+                (
+                    index
+                    for index, line in enumerate(lines)
+                    if ReflexCodeSearcher._DEFINITION_LINE_RE.match(line)
+                ),
+                next((index for index, line in enumerate(lines) if line.strip()), 0),
+            )
+
+        python_excerpt = ReflexCodeSearcher._python_definition_excerpt(content, lines, best_index)
+        if python_excerpt is not None:
+            return python_excerpt[:600]
+
+        start = max(0, best_index - 1)
+        end = min(len(lines), best_index + 8)
+        excerpt_lines = [
+            f"{index + 1}: {lines[index].rstrip()}"
+            for index in range(start, end)
+            if lines[index].strip()
+        ]
+
+        excerpt = "\n".join(excerpt_lines)
+        return excerpt[:600]
+
+    @staticmethod
+    def _python_definition_excerpt(content: str, lines: list[str], line_index: int) -> str | None:
+        try:
+            tree = ast.parse(content)
+        except SyntaxError:
+            return None
+
+        definition = next(
+            (
+                node
+                for node in ast.walk(tree)
+                if isinstance(node, (ast.AsyncFunctionDef, ast.FunctionDef, ast.ClassDef))
+                and node.lineno == line_index + 1
+            ),
+            None,
+        )
+        if definition is None:
+            return None
+
+        body = definition.body
+        first_body_line = body[0].lineno if body else None
+        if (
+            len(body) > 1
+            and isinstance(body[0], ast.Expr)
+            and isinstance(body[0].value, ast.Constant)
+            and isinstance(body[0].value.value, str)
+        ):
+            body = body[1:]
+
+        if not body:
+            return None
+
+        signature_end = (first_body_line or body[0].lineno) - 2
+        selected_indices = [line_index]
+        if signature_end > line_index:
+            if signature_end - line_index <= 4:
+                selected_indices.extend(range(line_index + 1, signature_end + 1))
+            else:
+                selected_indices.append(signature_end)
+
+        body_start = body[0].lineno - 1
+        body_end = min(definition.end_lineno or len(lines), body_start + 5)
+        selected_indices.extend(range(body_start, body_end))
+
+        return "\n".join(
+            f"{index + 1}: {lines[index].rstrip()}"
+            for index in selected_indices
+            if 0 <= index < len(lines) and lines[index].strip()
+        )
 
     # ------------------------------------------------------------------
     # Async variants — parallel Jev scoring via asyncio

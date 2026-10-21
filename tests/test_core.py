@@ -469,6 +469,26 @@ class TestDefaultFallback:
 # ---------------------------------------------------------------------------
 
 class TestReflexCodeSearcher:
+    def test_excerpt_prefers_matching_definition_with_context(self):
+        content = '''import asyncio
+from elsewhere import async_search
+
+class ReflexCodeSearcher:
+    async def async_search(
+        self,
+        query: str,
+    ):
+        """Run an async search."""
+        return await run_search(query)
+'''
+
+        excerpt = ReflexCodeSearcher._excerpt(content, "Where is async_search implemented?")
+
+        assert "5:     async def async_search" in excerpt
+        assert "10:         return await run_search(query)" in excerpt
+        assert "import asyncio" not in excerpt
+        assert "from elsewhere" not in excerpt
+
     def test_finds_relevant_file(self, tmp_path):
         repo = tmp_path / "repo"
         repo.mkdir()

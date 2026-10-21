@@ -30,39 +30,48 @@ reflex-search "<query>" <repo_root> --json
 
 **Common options:**
 - `--top-k N` — Max files to return (default 5)
-- `--threshold F` — Accept threshold (default 0.65; use 0.30 for broader results)
+- `--threshold F` — Accept threshold (default 0.65; lower it only if relevant files are missing, since lower values add weaker matches)
 - `--json` — Emit structured JSON output
+
+## Verify the result
+
+Treat ranked paths and excerpts as leads. Local scoring can find the right file while its excerpt shows an import or other nearby text instead of the implementation.
+
+1. For definition searches, include the exact symbol in the query when you know it, such as `"Where is async_search implemented?"`.
+2. Check that the excerpt shows the relevant class, function, or setting. Excerpts include line numbers for navigation.
+3. If it does not, inspect the candidate file or search for the symbol directly (for example, `rg -n "async_search" <repo_root>`). Confirm the implementation in source before answering.
+4. If the relevant file is absent, broaden the query or lower `--threshold` and inspect the added candidates.
 
 ## Examples
 
 ### Local search (fast, offline)
 
 ```bash
-reflex-search "How does authentication work?" ./my-repo --json --threshold 0.30
+reflex-search "How does authentication work?" ./my-repo --json
 ```
 
 ### Smart fallback (local + Jev for uncertain candidates)
 
 ```bash
-reflex-search "Where are streaming responses handled?" ./my-repo --smart-fallback --json --threshold 0.30
+reflex-search "Where are streaming responses handled?" ./my-repo --smart-fallback --json
 ```
 
 ### Async smart fallback (parallel Jev calls)
 
 ```bash
-reflex-search "Where are streaming responses handled?" ./my-repo --smart-fallback --async --json --threshold 0.30
+reflex-search "Where are streaming responses handled?" ./my-repo --smart-fallback --async --json
 ```
 
 ### Two-pass live mode (LocalScorer shortlists, Jev re-scores)
 
 ```bash
-reflex-search "How does the transport layer work?" ./my-repo --live --shortlist 20 --json --threshold 0.30
+reflex-search "How does the transport layer work?" ./my-repo --live --shortlist 20 --json
 ```
 
 ### Async two-pass (parallel Jev re-scoring)
 
 ```bash
-reflex-search "How does the transport layer work?" ./my-repo --live --async --shortlist 20 --json --threshold 0.30
+reflex-search "How does the transport layer work?" ./my-repo --live --async --shortlist 20 --json
 ```
 
 ## JSON output shape
@@ -98,7 +107,7 @@ reflex-search "How does the transport layer work?" ./my-repo --live --async --sh
 
 - **Missing API key:** `--smart-fallback`, `--live`, and `--async` modes fall back to local scoring silently if `OPENROUTER_API_KEY` is not set.
 - **Large repos:** Local scoring is fast (~100ms for 30 files). For repos with hundreds of files, use `--live --shortlist 20` to limit Jev calls.
-- **Threshold tuning:** Default 0.65 is strict. Use 0.30 for exploratory searches. Use `--stats` to see how many files were accepted/rejected.
+- **Threshold tuning:** Default 0.65 favors precision. Lower it to 0.30 if relevant files are missing, then inspect the additional candidates. Use `--stats` to see how many files were accepted/rejected.
 - **No results:** Lower `--threshold` or broaden the query. Add `--verbose` to inspect the full audit trail.
 
 ## Additional flags

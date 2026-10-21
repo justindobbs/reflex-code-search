@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 from collections.abc import Callable
 from typing import Any
@@ -16,7 +17,7 @@ from reflex_search.models import (
     SearchSession,
     SessionTelemetry,
 )
-from reflex_search.scorers import JevScorer, LocalScorer
+from reflex_search.scorers import AsyncJevScorer, JevScorer, LocalScorer
 
 
 class ReflexCodeSearcher:
@@ -337,3 +338,226 @@ class ReflexCodeSearcher:
             excerpt = "\n".join(matches)
 
         return excerpt[:400]
+
+    # ------------------------------------------------------------------
+    # Async variants — parallel Jev scoring via asyncio
+    # ------------------------------------------------------------------
+
+    async def async_search(
+        self,
+        query: str,
+        repo_root: str | None = None,
+        top_k: int | None = None,
+        async_scorer: AsyncJevScorer | None = None,
+        concurrency: int = 10,
+    ) -> SearchSession:
+        """Local scoring + parallel async Jev fallback for uncertain candidates.
+
+        Pass 1 scores every file with the instance's (typically local) scorer
+        synchronously.  Uncertain candidates are then re-scored in parallel
+        using *async_scorer* (defaults to a fresh ``AsyncJevScorer``).
+        """
+        requested_top_k = self.top_k if top_k is None else top_k
+        if requested_top_k < 0:
+            raise ValueError("top_k must be non-negative")
+        active_root = repo_root or self.repo_root
+        candidates = collect_files(active_root)
+        results: list[SearchResult] = []
+        audit: list[dict[str, Any]] = []
+        provider_name = getattr(self.scorer, "provider", "local")
+
+        # --- Pass 1: score all files with the sync scorer ---
+        scored: list[tuple[str, str, float]] = []
+        for candidate in candidates:
+            try:
+                content = read_file(candidate, active_root)
+            except OSError:
+                continue
+            score = self.scorer.score(candidate, query, content)
+            scored.append((candidate, content, score))
+
+        ranked = sorted(scored, key=lambda t: t[2], reverse=True)
+        top_runner_up = ranked[1][2] if len(ranked) > 1 else 0.0
+
+        accepted: list[tuple[str, str, float]] = []
+        uncertain: list[tuple[str, str, float]] = []
+
+        for candidate, content, score in scored:
+            decision = self.gate.decide(
+                score,
+                runner_up=top_runner_up if ranked and ranked[0][0] == candidate else 0.0,
+            )
+            audit.append({
+                "step": len(audit) + 1,
+                "provider": provider_name,
+                "score": score,
+                "decision": decision.value,
+                "path": candidate,
+            })
+            if decision is GateDecision.ACCEPT:
+                accepted.append((candidate, content, score))
+            elif decision is GateDecision.UNCERTAIN:
+                uncertain.append((candidate, content, score))
+
+        # Add accepted results immediately
+        for candidate, content, score in accepted:
+            results.append(
+                SearchResult(
+                    path=candidate,
+                    score=score,
+                    provider=provider_name,
+                    reason="Accepted by confidence gate",
+                    excerpt=self._excerpt(content, query),
+                )
+            )
+
+        # --- Pass 2: parallel async Jev scoring for uncertain candidates ---
+        if uncertain:
+            jev = async_scorer or AsyncJevScorer()
+            sem = asyncio.Semaphore(concurrency)
+
+            async def _score_one(path: str, q: str, cont: str) -> tuple[str, str, float, dict[str, Any]]:
+                async with sem:
+                    s = await jev.score(path, q, cont)
+                    telemetry: dict[str, Any] = {
+                        "latency_ms": jev.last_latency_ms,
+                        "cost": jev.last_cost,
+                        "input_tokens": jev.last_input_tokens,
+                    }
+                    return path, cont, s, telemetry
+
+            tasks = [_score_one(c, query, cont) for c, cont, _ in uncertain]
+            fb_results = await asyncio.gather(*tasks)
+
+            for candidate, content, fb_score, fb_telemetry in fb_results:
+                fb_decision = self.gate.decide(fb_score)
+                fb_provider = jev.provider
+                if fb_decision is GateDecision.ACCEPT:
+                    results.append(
+                        SearchResult(
+                            path=candidate,
+                            score=fb_score,
+                            provider=fb_provider,
+                            reason="Escalated from uncertain; accepted by async fallback",
+                            excerpt=self._excerpt(content, query),
+                        )
+                    )
+                audit.append({
+                    "step": len(audit) + 1,
+                    "provider": fb_provider,
+                    "score": fb_score,
+                    "decision": fb_decision.value,
+                    "path": candidate,
+                    **fb_telemetry,
+                })
+
+        results.sort(key=lambda r: r.score, reverse=True)
+        limit = min(requested_top_k, len(results))
+        telemetry_summary = self._compute_telemetry(audit)
+
+        return SearchSession(
+            query=query,
+            repo_root=active_root,
+            results=results[:limit],
+            audit_trail=audit,
+            telemetry=telemetry_summary,
+        )
+
+    async def async_search_two_pass(
+        self,
+        query: str,
+        async_scorer: AsyncJevScorer | None = None,
+        repo_root: str | None = None,
+        top_k: int | None = None,
+        shortlist_size: int = 20,
+        concurrency: int = 10,
+    ) -> SearchSession:
+        """Two-pass search: LocalScorer narrows, AsyncJevScorer re-scores in parallel."""
+        requested_top_k = self.top_k if top_k is None else top_k
+        if requested_top_k < 0:
+            raise ValueError("top_k must be non-negative")
+        if shortlist_size < 0:
+            raise ValueError("shortlist_size must be non-negative")
+        active_root = repo_root or self.repo_root
+        candidates = collect_files(active_root)
+        audit: list[dict[str, Any]] = []
+
+        # --- Pass 1: LocalScorer scores all files, keep top N ---
+        local = LocalScorer()
+        scored: list[tuple[str, float, str]] = []
+
+        for candidate in candidates:
+            try:
+                content = read_file(candidate, active_root)
+            except OSError:
+                continue
+            score = local.score(candidate, query, content)
+            scored.append((candidate, score, content))
+            audit.append({
+                "step": len(audit) + 1,
+                "provider": "local",
+                "score": score,
+                "decision": "prefilter",
+                "path": candidate,
+            })
+
+        scored.sort(key=lambda t: t[1], reverse=True)
+        shortlist = scored[:shortlist_size]
+
+        # --- Pass 2: parallel async Jev re-scoring ---
+        jev = async_scorer or AsyncJevScorer()
+        sem = asyncio.Semaphore(concurrency)
+        results: list[SearchResult] = []
+        pass2_start = len(audit)
+
+        async def _score_one(path: str, q: str, cont: str) -> tuple[str, str, float, dict[str, Any]]:
+            async with sem:
+                s = await jev.score(path, q, cont)
+                telemetry: dict[str, Any] = {
+                    "latency_ms": jev.last_latency_ms,
+                    "cost": jev.last_cost,
+                    "input_tokens": jev.last_input_tokens,
+                }
+                return path, cont, s, telemetry
+
+        tasks = [_score_one(c, query, cont) for c, _, cont in shortlist]
+        jev_results = await asyncio.gather(*tasks)
+
+        jev_ranked = sorted(jev_results, key=lambda item: item[2], reverse=True)
+        top_runner_up = jev_ranked[1][2] if len(jev_ranked) > 1 else 0.0
+
+        for i, (candidate, content, score, telemetry) in enumerate(jev_results, start=1):
+            decision = self.gate.decide(
+                score,
+                runner_up=top_runner_up if jev_ranked and jev_ranked[0][0] == candidate else 0.0,
+            )
+            if decision is GateDecision.ACCEPT:
+                results.append(
+                    SearchResult(
+                        path=candidate,
+                        score=score,
+                        provider="jev-async",
+                        reason="Accepted by Jev (async two-pass)",
+                        excerpt=self._excerpt(content, query),
+                    )
+                )
+            audit.append({
+                "step": pass2_start + i,
+                "provider": "jev-async",
+                "score": score,
+                "decision": decision.value,
+                "path": candidate,
+                **telemetry,
+            })
+
+        results.sort(key=lambda r: r.score, reverse=True)
+        limit = min(requested_top_k, len(results))
+        telemetry_summary = self._compute_telemetry(audit)
+
+        return SearchSession(
+            query=query,
+            repo_root=active_root,
+            results=results[:limit],
+            audit_trail=audit,
+            telemetry=telemetry_summary,
+        )

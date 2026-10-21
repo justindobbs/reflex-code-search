@@ -11,6 +11,8 @@ from pathlib import Path
 
 import httpx
 
+from reflex_search.ast_extract import extract_python_metadata
+
 logger = logging.getLogger(__name__)
 
 _DECISIONS_URL = "https://openrouter.ai/api/alpha/decisions"
@@ -182,8 +184,15 @@ class LocalScorer:
             bigram_score = 0.15 * ((path_bigram_hits + content_bigram_hits) / nb)
 
         # --- Definition-aware boosting ---
+        # For Python files, use AST extraction (full content, no truncation).
+        # For other files, fall back to regex on the content preview.
         def_score = 0.0
-        definitions = _DEFINITION_RE.findall(content[:8000])
+        is_python = file_path.lower().endswith(".py")
+        if is_python:
+            ast_meta = extract_python_metadata(content)
+            definitions = ast_meta.definitions
+        else:
+            definitions = _DEFINITION_RE.findall(content[:8000])
         if definitions:
             def_names = {d.lower() for d in definitions}
             normalized_definitions = " ".join(
@@ -221,11 +230,14 @@ class LocalScorer:
                 for symbol in query_identifiers
                 if "decorator" in query_lower and symbol.lower() not in _STOPWORDS
             }
-            # Large modules can declare the requested symbol beyond the text
-            # preview. Search all declarations only for explicit symbol queries.
-            declared_symbols = {
-                name.lower() for name in _DEFINITION_RE.findall(content)
-            }
+            # AST already extracted all declarations from full content for .py;
+            # for other files, search all declarations via regex.
+            if is_python:
+                declared_symbols = {name.lower() for name in definitions}
+            else:
+                declared_symbols = {
+                    name.lower() for name in _DEFINITION_RE.findall(content)
+                }
             exact_symbol_hits = len(query_symbols & declared_symbols)
             def_score += min(0.50, 0.25 * exact_symbol_hits)
 
@@ -238,11 +250,17 @@ class LocalScorer:
 
         # --- Docstring boosting ---
         doc_score = 0.0
-        doc_match = _DOCSTRING_RE.search(content[:8000])
-        if doc_match:
-            docstring = doc_match.group(1).lower()
-            doc_hits = self._weighted_hits(expanded, originals, docstring)
-            doc_score = 0.10 * (doc_hits / n)
+        if is_python:
+            if ast_meta.docstring:
+                docstring = ast_meta.docstring.lower()
+                doc_hits = self._weighted_hits(expanded, originals, docstring)
+                doc_score = 0.10 * (doc_hits / n)
+        else:
+            doc_match = _DOCSTRING_RE.search(content[:8000])
+            if doc_match:
+                docstring = doc_match.group(1).lower()
+                doc_hits = self._weighted_hits(expanded, originals, docstring)
+                doc_score = 0.10 * (doc_hits / n)
 
         total = path_score + content_score + bigram_score + def_score + doc_score
 
@@ -545,4 +563,102 @@ class JevScorer:
             return self._fallback.score(file_path, query, content)
         except Exception as exc:  # noqa: BLE001
             logger.warning("Jev API error (%s), falling back to local", type(exc).__name__)
+            return self._fallback.score(file_path, query, content)
+
+
+class AsyncJevScorer:
+    """Async variant of :class:`JevScorer` for parallel scoring.
+
+    Uses ``httpx.AsyncClient`` so multiple files can be scored concurrently
+    via ``asyncio.gather``.  Payload construction, redaction, and fallback
+    logic are identical to the synchronous scorer.
+    """
+
+    provider = "jev-async"
+
+    def __init__(
+        self,
+        *,
+        api_key: str | None = None,
+        model: str | None = None,
+        timeout: float = 10.0,
+        state_redactor: Callable[[str], str] | None = None,
+    ) -> None:
+        self._api_key_override = api_key
+        self.model = model or os.environ.get("JEV_MODEL", _DEFAULT_JEV_MODEL)
+        self._timeout = timeout
+        self._state_redactor = state_redactor or JevScorer._default_redactor
+        self._fallback = LocalScorer()
+        self.last_latency_ms: float = 0.0
+        self.last_cost: float = 0.0
+        self.last_input_tokens: int = 0
+
+    def _get_api_key(self) -> str:
+        if self._api_key_override is not None:
+            return self._api_key_override
+        return os.environ.get("OPENROUTER_API_KEY", "")
+
+    async def score(self, file_path: str, query: str, content: str) -> float:
+        """Score a file asynchronously via the Jev Decisions API."""
+        self.last_latency_ms = 0.0
+        self.last_cost = 0.0
+        self.last_input_tokens = 0
+
+        api_key = self._get_api_key()
+        if not api_key:
+            logger.debug("No API key, falling back to local scorer")
+            return self._fallback.score(file_path, query, content)
+
+        state = self._state_redactor(f"File: {file_path}\n\n{content[:2000]}")
+        payload = {
+            "model": self.model,
+            "state": state,
+            "questions": {
+                "relevance": {
+                    "type": "noul",
+                    "instructions": (
+                        f"{JevScorer._NOUL_INSTRUCTION} Question: {query}"
+                    ),
+                }
+            },
+        }
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+
+        try:
+            t0 = time.perf_counter()
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(
+                    _DECISIONS_URL,
+                    json=payload,
+                    headers=headers,
+                    timeout=self._timeout,
+                )
+            self.last_latency_ms = round((time.perf_counter() - t0) * 1000, 2)
+
+            if resp.status_code == 401:
+                logger.warning("Jev API returned 401 — check OPENROUTER_API_KEY")
+                return self._fallback.score(file_path, query, content)
+            if resp.status_code == 429:
+                logger.warning("Jev API rate limited (429), falling back to local")
+                return self._fallback.score(file_path, query, content)
+
+            resp.raise_for_status()
+            body = resp.json()
+
+            usage = body.get("usage", {})
+            self.last_cost = usage.get("cost", 0.0)
+            self.last_input_tokens = usage.get("input_tokens", 0)
+
+            answer = body.get("answers", {}).get("relevance", {})
+            raw_noul = answer.get("noul")
+            if raw_noul is not None and isinstance(raw_noul, (int, float)):
+                return round(min(max(float(raw_noul), 0.0), 1.0), 4)
+
+            logger.warning("Jev returned no noul value, falling back to local")
+            return self._fallback.score(file_path, query, content)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Jev async API error (%s), falling back to local", type(exc).__name__)
             return self._fallback.score(file_path, query, content)

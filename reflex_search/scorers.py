@@ -347,8 +347,7 @@ class LocalScorer:
         # --- Test file demotion ---
         is_test_file = (
             any(part in ("tests", "test") for part in path_parts)
-            or file_basename.startswith("test_")
-            or file_basename.startswith("conftest")
+            or file_basename.startswith(("test_", "conftest"))
         )
         test_intent = any(
             term in query_lower

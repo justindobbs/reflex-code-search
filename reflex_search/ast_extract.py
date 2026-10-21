@@ -38,9 +38,7 @@ def extract_python_metadata(source: str) -> PythonMetadata:
     docstring = ast.get_docstring(tree)
 
     for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            definitions.append(node.name)
-        elif isinstance(node, ast.ClassDef):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
             definitions.append(node.name)
         elif isinstance(node, ast.Import):
             for alias in node.names:

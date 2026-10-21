@@ -269,6 +269,7 @@ class TestAsyncSearchTwoPass:
 class TestCliAsync:
     def test_async_requires_live_or_smart_fallback(self):
         from typer.testing import CliRunner
+
         from reflex_search.cli import app
 
         result = CliRunner().invoke(app, ["query", ".", "--async"])

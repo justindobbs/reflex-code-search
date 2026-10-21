@@ -212,7 +212,9 @@ class LocalScorer:
             specific_query_symbols = {
                 symbol.lower()
                 for symbol in query_identifiers
-                if "_" in symbol or symbol[0].isupper() or re.search(r"[A-Z]", symbol[1:])
+                if "_" in symbol
+                or (not symbol.isupper() and re.search(r"[A-Z]", symbol[1:]))
+                or (symbol[0].isupper() and len(symbol) > 1 and not symbol.isupper() and symbol.lower() not in _STOPWORDS)
             }
             query_symbols = specific_query_symbols | {
                 symbol.lower()
@@ -315,27 +317,70 @@ class LocalScorer:
         ):
             total += min(0.20, 0.10 * len(query_outcomes & enum_values))
 
-        # Evaluation fixtures repeat their own query text and can otherwise
-        # outrank implementation files for unrelated questions.
+        # --- File-type demotions ---
+        # When the query asks about implementation, test/doc/tool files that
+        # mention the same terms are usually noise.  Each demotion is guarded
+        # by an intent check so queries explicitly about those categories
+        # are unaffected.
         normalized_path = file_path.lower().replace("\\", "/")
+        path_parts = normalized_path.split("/")
+        file_basename = path_parts[-1] if path_parts else ""
+
+        # --- Test file demotion ---
+        is_test_file = (
+            any(part in ("tests", "test") for part in path_parts)
+            or file_basename.startswith("test_")
+            or file_basename.startswith("conftest")
+        )
+        test_intent = any(
+            term in query_lower
+            for term in ("test", "tests", "testing", "unittest", "pytest", "fixture", "conftest")
+        )
+        if is_test_file and not test_intent:
+            total *= 0.65
+
+        # --- Documentation file demotion ---
+        is_doc_file = file_basename.endswith((".md", ".rst", ".txt"))
+        documentation_intent = any(
+            term in query_lower
+            for term in (
+                "readme", "document", "documentation", "release",
+                "changelog", "roadmap", "overview", "checklist",
+                "architecture", "documented",
+            )
+        )
         benchmark_intent = any(
             term in query_lower
             for term in ("benchmark", "recall", "precision", "mrr", "evaluation")
         )
-        if not benchmark_intent and normalized_path.endswith(
-            ("benchmarks/queries.json", "docs/benchmarks.md")
-        ):
-            total *= 0.25
+        if is_doc_file and not documentation_intent and not benchmark_intent:
+            total *= 0.55
 
-        documentation_intent = any(
-            term in query_lower
-            for term in ("readme", "document", "documentation", "release", "changelog", "roadmap", "overview")
+        # --- Tool / benchmark fixture demotion ---
+        is_tool_file = any(part == "tools" for part in path_parts)
+        is_benchmark_fixture = normalized_path.endswith(
+            ("benchmarks/queries.json", "docs/benchmarks.md")
         )
-        if not documentation_intent and query_lower.startswith(("how ", "where ", "when ")):
-            if normalized_path.endswith("/readme.md") or normalized_path == "readme.md":
-                total *= 0.70
-            elif normalized_path.endswith("/changelog.md") or normalized_path == "changelog.md":
-                total *= 0.50
+        tool_intent = any(
+            term in query_lower
+            for term in (
+                "benchmark", "harness", "tool", "compare_runs",
+                "step_labels", "step-level", "sweep", "report", "label",
+            )
+        )
+        if is_benchmark_fixture and not benchmark_intent:
+            total *= 0.25
+        elif is_tool_file and not tool_intent:
+            total *= 0.60
+
+        # --- Example file demotion ---
+        is_example_file = any(part == "examples" for part in path_parts)
+        example_intent = any(
+            term in query_lower
+            for term in ("example", "demo", "sample", "reference")
+        )
+        if is_example_file and not example_intent:
+            total *= 0.50
 
         return round(min(total, 1.0), 4)
 

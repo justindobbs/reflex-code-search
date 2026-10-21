@@ -6,6 +6,7 @@ in local mode, and reports recall@k, latency, and summary statistics.
 
 Usage:
     python tools/bench.py                          # local scorer only
+    python tools/bench.py --smart-fallback          # local + Jev fallback for uncertain
     python tools/bench.py --live                   # also run with JevScorer
     python tools/bench.py --top-k 10               # override top_k
     python tools/bench.py --output results.md      # write markdown to file
@@ -28,6 +29,7 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_PROJECT_ROOT))
 load_dotenv(_PROJECT_ROOT / ".env")
 
+from reflex_search.fallback import JevFallback
 from reflex_search.scorers import JevScorer, LocalScorer
 from reflex_search.searcher import ReflexCodeSearcher
 
@@ -46,6 +48,7 @@ def _run_suite(
     suite: dict[str, Any],
     *,
     live: bool = False,
+    smart_fallback: bool = False,
     top_k: int = 5,
     threshold: float = 0.30,
     max_queries: int | None = None,
@@ -56,17 +59,20 @@ def _run_suite(
 
     queries = suite["queries"][:max_queries] if max_queries else suite["queries"]
     total = len(queries)
+    show_progress = live or smart_fallback
 
     for idx, entry in enumerate(queries, 1):
         query = entry["query"]
         expected = {_normalise(p) for p in entry["expected_files"]}
-        if live:
+        if show_progress:
             print(f"    [{idx}/{total}] {query[:55]}...", end="", flush=True)
 
         scorer = JevScorer(timeout=15.0) if live else LocalScorer()
+        fallback = JevFallback(timeout=15.0) if smart_fallback else None
         searcher = ReflexCodeSearcher(
             repo_root=repo_root,
             scorer=scorer,
+            fallback=fallback,
             accept_threshold=threshold,
             uncertain_threshold=0.10,
             top_k=top_k,
@@ -92,6 +98,11 @@ def _run_suite(
             total_cost += step.get("cost", 0.0)
             total_tokens += step.get("input_tokens", 0)
 
+        fallback_calls = sum(
+            1 for step in session.audit_trail
+            if step.get("provider") in ("jev-fallback",)
+        )
+
         result = {
             "query": query,
             "expected": sorted(expected),
@@ -106,8 +117,9 @@ def _run_suite(
             "input_tokens": total_tokens,
             "provider": scorer.provider,
             "candidates_scored": len(session.audit_trail),
+            "fallback_calls": fallback_calls,
         }
-        if live:
+        if show_progress:
             print(f" {elapsed_ms:.0f}ms  {recall:.0%}")
         results.append(result)
 
@@ -128,7 +140,8 @@ def _format_markdown(
     )
     lines.append(
         "The independent Click suite uses upstream tag 8.5.0 and expects its "
-        "checkout at `.benchmark-repos/click`; CI checks it out automatically.\n"
+        "checkout at `.benchmark-repos/click`; the httpx suite uses upstream tag "
+        "0.28.1 at `.benchmark-repos/httpx`. CI checks out both automatically.\n"
     )
 
     for label, results in all_results.items():
@@ -189,8 +202,10 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(description="Benchmark reflex-code-search")
     parser.add_argument("--live", action="store_true", help="Also benchmark with JevScorer")
+    parser.add_argument("--smart-fallback", action="store_true", help="Also benchmark with Local + Jev fallback")
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--threshold", type=float, default=0.30)
+    parser.add_argument("--suite", type=str, default=None, help="Run only the named suite (e.g. httpx)")
     parser.add_argument("--max-queries", type=int, default=None, help="Max queries per suite (useful for live)")
     parser.add_argument("--output", type=str, default=None, help="Write markdown to file")
     args = parser.parse_args()
@@ -204,6 +219,8 @@ def main() -> None:
     all_results: dict[str, list[dict[str, Any]]] = {}
 
     for suite in data["suites"]:
+        if args.suite and suite["name"] != args.suite:
+            continue
         suite_root = (_PROJECT_ROOT / suite["repo_root"]).resolve()
         if not suite_root.exists():
             print(f"SKIP: {suite['name']} — repo not found at {suite_root}")
@@ -223,6 +240,26 @@ def main() -> None:
 
         avg = sum(r["recall"] for r in results) / len(results) if results else 0
         print(f"\n  Average recall: {avg:.0%}  |  Avg latency: {sum(r['latency_ms'] for r in results)/len(results):.0f}ms")
+
+        if args.smart_fallback:
+            label_sf = f"{suite['name']} (smart-fallback)"
+            print(f"\n{'='*60}")
+            print(f"Running: {label_sf}")
+            print(f"{'='*60}")
+
+            results_sf = _run_suite(suite, smart_fallback=True, top_k=args.top_k, threshold=args.threshold, max_queries=args.max_queries)
+            all_results[label_sf] = results_sf
+
+            for r in results_sf:
+                status = "[ok]" if r["recall"] == 1.0 else f"[missed: {r['missed']}]"
+                fb = f"  fb={r['fallback_calls']}" if r["fallback_calls"] else ""
+                print(f"  [{r['recall']:.0%}] {r['query'][:55]}  {status}{fb}")
+
+            avg = sum(r["recall"] for r in results_sf) / len(results_sf) if results_sf else 0
+            avg_lat = sum(r["latency_ms"] for r in results_sf) / len(results_sf) if results_sf else 0
+            total_cost = sum(r["cost"] for r in results_sf)
+            total_fb = sum(r["fallback_calls"] for r in results_sf)
+            print(f"\n  Average recall: {avg:.0%}  |  Avg latency: {avg_lat:.0f}ms  |  Total cost: ${total_cost:.4f}  |  Fallback calls: {total_fb}")
 
         if args.live:
             label_live = f"{suite['name']} (jev)"

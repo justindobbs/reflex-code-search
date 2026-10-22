@@ -17,6 +17,17 @@ time.
 Security fixes target the latest release. Older releases may not receive fixes;
 upgrade to the latest release before reporting an issue when possible.
 
+## Python package installation
+
+The runtime dependency list requires `certifi>=2026.10.19` because HTTPX uses
+certifi's CA bundle for HTTPS by default. The October 2026 emSign incident also
+affects older pip releases: pip versions before 26.2.2 still trust the
+compromised certificates when connecting to package indexes. Upgrade pip in
+existing environments using the secure bootstrap instructions in the
+[Python packaging incident notice](https://discuss.python.org/t/information-for-python-users-regarding-emudhra-emsign-ca-certificate-security-incident/109576).
+Rebuild container images without cached layers so updated system certificates
+are included.
+
 ## Handling code and credentials
 
 Local search runs on your machine and does not send repository contents to a

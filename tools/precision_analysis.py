@@ -12,8 +12,8 @@ from pathlib import Path
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_PROJECT_ROOT))
 
-from reflex_search.scorers import LocalScorer  # noqa: E402
-from reflex_search.searcher import ReflexCodeSearcher  # noqa: E402
+from reflex_search.scorers import LocalScorer
+from reflex_search.searcher import ReflexCodeSearcher
 
 
 def _categorize(file_path: str) -> str:

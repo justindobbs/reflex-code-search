@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import asyncio
+import math
 import os
 import re
 from collections.abc import Callable
@@ -15,6 +16,7 @@ from reflex_search.gate import ConfidenceGate
 from reflex_search.models import (
     GateDecision,
     Scorer,
+    SearchCandidate,
     SearchResult,
     SearchSession,
     SessionTelemetry,
@@ -67,6 +69,7 @@ class ReflexCodeSearcher:
         active_root = repo_root or self.repo_root
         candidates = collect_files(active_root)
         results: list[SearchResult] = []
+        suggestions: list[SearchCandidate] = []
         audit: list[dict[str, Any]] = []
         provider_name = getattr(self.scorer, "provider", "local")
 
@@ -162,10 +165,21 @@ class ReflexCodeSearcher:
                     "step": len(audit) + 1,
                     "provider": fb_provider,
                     "score": fb_score,
-                    "decision": "reject",
+                    "decision": fb_decision.value,
                     "path": candidate,
                     **fb_telemetry,
                 })
+                if self._has_candidate_score(fb_score):
+                    suggestions.append(
+                        SearchCandidate(
+                            path=candidate,
+                            score=fb_score,
+                            provider=fb_provider,
+                            decision=fb_decision.value,
+                            reason="Fallback did not pass the accept gate",
+                            excerpt=self._excerpt(content, query),
+                        )
+                    )
                 continue
 
             audit.append({
@@ -176,9 +190,22 @@ class ReflexCodeSearcher:
                 "path": candidate,
                 **telemetry,
             })
+            if self._has_candidate_score(score):
+                suggestions.append(
+                    SearchCandidate(
+                        path=candidate,
+                        score=score,
+                        provider=provider_name,
+                        decision=decision.value,
+                        reason=self._candidate_reason(decision),
+                        excerpt=self._excerpt(content, query),
+                    )
+                )
 
         results.sort(key=lambda r: r.score, reverse=True)
+        suggestions.sort(key=lambda r: r.score, reverse=True)
         limit = min(requested_top_k, len(results))
+        candidate_limit = min(requested_top_k, len(suggestions))
 
         telemetry_summary = self._compute_telemetry(audit)
 
@@ -188,6 +215,7 @@ class ReflexCodeSearcher:
             results=results[:limit],
             audit_trail=audit,
             telemetry=telemetry_summary,
+            candidates=suggestions[:candidate_limit],
         )
 
     def search_two_pass(
@@ -235,6 +263,7 @@ class ReflexCodeSearcher:
         # --- Pass 2: JevScorer re-scores the shortlist ---
         jev = jev_scorer or JevScorer()
         results: list[SearchResult] = []
+        suggestions: list[SearchCandidate] = []
         pass2_start = len(audit)
 
         jev_scored: list[tuple[str, str, float, dict[str, Any]]] = []
@@ -267,6 +296,17 @@ class ReflexCodeSearcher:
                         excerpt=self._excerpt(content, query),
                     )
                 )
+            elif self._has_candidate_score(score):
+                suggestions.append(
+                    SearchCandidate(
+                        path=candidate,
+                        score=score,
+                        provider="jev",
+                        decision=decision.value,
+                        reason=self._candidate_reason(decision),
+                        excerpt=self._excerpt(content, query),
+                    )
+                )
 
             audit.append({
                 "step": pass2_start + i,
@@ -278,7 +318,9 @@ class ReflexCodeSearcher:
             })
 
         results.sort(key=lambda r: r.score, reverse=True)
+        suggestions.sort(key=lambda r: r.score, reverse=True)
         limit = min(requested_top_k, len(results))
+        candidate_limit = min(requested_top_k, len(suggestions))
 
         telemetry_summary = self._compute_telemetry(audit)
 
@@ -288,7 +330,18 @@ class ReflexCodeSearcher:
             results=results[:limit],
             audit_trail=audit,
             telemetry=telemetry_summary,
+            candidates=suggestions[:candidate_limit],
         )
+
+    @staticmethod
+    def _candidate_reason(decision: GateDecision) -> str:
+        if decision is GateDecision.UNCERTAIN:
+            return "Uncertain candidate; did not pass the accept gate"
+        return "Low-confidence candidate; shown for manual inspection"
+
+    @staticmethod
+    def _has_candidate_score(score: Any) -> bool:
+        return isinstance(score, (int, float)) and math.isfinite(score) and score > 0
 
     @staticmethod
     def _compute_telemetry(audit: list[dict[str, Any]]) -> SessionTelemetry:
@@ -455,6 +508,7 @@ class ReflexCodeSearcher:
         active_root = repo_root or self.repo_root
         candidates = collect_files(active_root)
         results: list[SearchResult] = []
+        suggestions: list[SearchCandidate] = []
         audit: list[dict[str, Any]] = []
         provider_name = getattr(self.scorer, "provider", "local")
 
@@ -490,6 +544,17 @@ class ReflexCodeSearcher:
                 accepted.append((candidate, content, score))
             elif decision is GateDecision.UNCERTAIN:
                 uncertain.append((candidate, content, score))
+            elif self._has_candidate_score(score):
+                suggestions.append(
+                    SearchCandidate(
+                        path=candidate,
+                        score=score,
+                        provider=provider_name,
+                        decision=decision.value,
+                        reason=self._candidate_reason(decision),
+                        excerpt=self._excerpt(content, query),
+                    )
+                )
 
         # Add accepted results immediately
         for candidate, content, score in accepted:
@@ -534,6 +599,17 @@ class ReflexCodeSearcher:
                             excerpt=self._excerpt(content, query),
                         )
                     )
+                elif self._has_candidate_score(fb_score):
+                    suggestions.append(
+                        SearchCandidate(
+                            path=candidate,
+                            score=fb_score,
+                            provider=fb_provider,
+                            decision=fb_decision.value,
+                            reason="Async fallback did not pass the accept gate",
+                            excerpt=self._excerpt(content, query),
+                        )
+                    )
                 audit.append({
                     "step": len(audit) + 1,
                     "provider": fb_provider,
@@ -544,7 +620,9 @@ class ReflexCodeSearcher:
                 })
 
         results.sort(key=lambda r: r.score, reverse=True)
+        suggestions.sort(key=lambda r: r.score, reverse=True)
         limit = min(requested_top_k, len(results))
+        candidate_limit = min(requested_top_k, len(suggestions))
         telemetry_summary = self._compute_telemetry(audit)
 
         return SearchSession(
@@ -553,6 +631,7 @@ class ReflexCodeSearcher:
             results=results[:limit],
             audit_trail=audit,
             telemetry=telemetry_summary,
+            candidates=suggestions[:candidate_limit],
         )
 
     async def async_search_two_pass(
@@ -600,6 +679,7 @@ class ReflexCodeSearcher:
         jev = async_scorer or AsyncJevScorer()
         sem = asyncio.Semaphore(concurrency)
         results: list[SearchResult] = []
+        suggestions: list[SearchCandidate] = []
         pass2_start = len(audit)
 
         async def _score_one(path: str, q: str, cont: str) -> tuple[str, str, float, dict[str, Any]]:
@@ -633,6 +713,17 @@ class ReflexCodeSearcher:
                         excerpt=self._excerpt(content, query),
                     )
                 )
+            elif self._has_candidate_score(score):
+                suggestions.append(
+                    SearchCandidate(
+                        path=candidate,
+                        score=score,
+                        provider="jev-async",
+                        decision=decision.value,
+                        reason=self._candidate_reason(decision),
+                        excerpt=self._excerpt(content, query),
+                    )
+                )
             audit.append({
                 "step": pass2_start + i,
                 "provider": "jev-async",
@@ -643,7 +734,9 @@ class ReflexCodeSearcher:
             })
 
         results.sort(key=lambda r: r.score, reverse=True)
+        suggestions.sort(key=lambda r: r.score, reverse=True)
         limit = min(requested_top_k, len(results))
+        candidate_limit = min(requested_top_k, len(suggestions))
         telemetry_summary = self._compute_telemetry(audit)
 
         return SearchSession(
@@ -652,4 +745,5 @@ class ReflexCodeSearcher:
             results=results[:limit],
             audit_trail=audit,
             telemetry=telemetry_summary,
+            candidates=suggestions[:candidate_limit],
         )

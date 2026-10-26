@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from reflex_search.scorers import AsyncJevScorer
 from reflex_search.searcher import ReflexCodeSearcher
 
+
 # ---------------------------------------------------------------------------
 # AsyncJevScorer
 # ---------------------------------------------------------------------------

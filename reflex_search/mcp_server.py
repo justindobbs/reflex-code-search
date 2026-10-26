@@ -46,7 +46,8 @@ def search_codebase(
 ) -> dict:
     """Search a codebase for files relevant to a natural-language question.
 
-    Returns ranked files with scores, excerpts, and telemetry.
+    Returns accepted results and separate lower-confidence candidate leads,
+    with scores, excerpts, gate decisions, and telemetry.
 
     Args:
         query: Natural-language question about the codebase.
@@ -97,6 +98,17 @@ def search_codebase(
                 "excerpt": r.excerpt,
             }
             for r in session.results
+        ],
+        "candidates": [
+            {
+                "path": c.path,
+                "score": c.score,
+                "provider": c.provider,
+                "decision": c.decision,
+                "reason": c.reason,
+                "excerpt": c.excerpt,
+            }
+            for c in session.candidates
         ],
         "telemetry": asdict(session.telemetry) if session.telemetry else None,
     }

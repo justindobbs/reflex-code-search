@@ -12,6 +12,7 @@ A small, focused implementation of semantic code search using a REFLEX-style con
 - fast local relevance scoring with bigram matching and definition boosting (offline by default)
 - optional live scoring via the [Jev Decisions API](https://openrouter.ai/docs/guides/community/jev)
 - three-way confidence gate (accept / uncertain / reject) with margin check
+- ranked candidate leads when no file passes the accept threshold
 - optional fallback scorer for uncertain matches
 - small, auditable search sessions with per-step telemetry
 - repository discovery that respects nested `.gitignore` files
@@ -149,6 +150,12 @@ JSON output for programmatic use:
 reflex-search "confidence gate" . --json --threshold 0.3
 ```
 
+Accepted files remain under `results`. The JSON response also includes a
+separate `candidates` list for positive-scoring files that did not pass the
+accept threshold. Each candidate includes its gate decision and excerpt so
+callers can inspect possible leads without treating them as accepted matches.
+In plain-text mode, these leads are shown when no accepted results are found.
+
 With the built-in fallback scorer for uncertain candidates:
 
 ```bash
@@ -171,7 +178,7 @@ reflex-search "How does the search loop work?" . --live --verbose
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--top-k` | 5 | Maximum number of files to return |
+| `--top-k` | 5 | Maximum accepted results and candidate leads to return in their respective lists |
 | `--threshold` | 0.65 | Accept threshold for the confidence gate |
 | `--uncertain` | 0.40 | Uncertain threshold below which candidates are rejected |
 | `--min-margin` | 0.0 | Minimum score margin required for an accept decision |
@@ -200,6 +207,7 @@ reflex-search "How does the search loop work?" . --live --verbose
       "excerpt": "def require_auth(user):"
     }
   ],
+  "candidates": [],
   "audit_trail": [
     {
       "step": 1,
@@ -225,6 +233,9 @@ session = searcher.search("Where are migrations defined?")
 
 for result in session.results:
     print(result.path, result.score, result.provider)
+
+for candidate in session.candidates:
+    print(candidate.decision, candidate.path, candidate.score)
 ```
 
 With live Jev scoring:

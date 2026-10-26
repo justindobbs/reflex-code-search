@@ -61,8 +61,12 @@ The confidence gate makes a **three-way decision** for each candidate:
 | Score range | Decision | Action |
 |-------------|----------|--------|
 | ≥ `accept_threshold` (default 0.65) | **accept** | Add to results |
-| ≥ `uncertain_threshold` (default 0.40) | **uncertain** | Escalate to fallback if configured, otherwise skip |
-| < `uncertain_threshold` | **reject** | Skip immediately |
+| ≥ `uncertain_threshold` (default 0.40) | **uncertain** | Escalate to fallback if configured; otherwise return as a candidate lead |
+| < `uncertain_threshold` | **reject** | Return a positive-scoring candidate lead separately from accepted results |
+
+Candidate leads are exposed in `SearchSession.candidates` and the CLI/MCP
+`candidates` field. They include the gate decision and supporting excerpt, but
+are never mixed into `results`. Zero-score files are omitted from this list.
 
 When `min_margin` is enabled, the searcher compares the highest candidate score
 with the runner-up. A close top result is downgraded to **uncertain**. The gate

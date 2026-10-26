@@ -7,7 +7,9 @@
 Keep reflex-code-search a lightweight, offline-first tool for finding relevant
 files in a codebase. Improve retrieval quality and make results predictable,
 explainable, and easy to evaluate. Keep the optional Jev integration separate
-from the local search path.
+from the local search path. The primary agent workflow is: given a code question
+or intended change, identify the smallest useful set of implementation, test,
+configuration, and caller files to inspect first, with evidence for each choice.
 
 ## Current baseline
 
@@ -83,3 +85,102 @@ Phases 1–5 are complete. Future work is tracked below.
 - Keep setup, CI, and documentation accurate.
 - Evaluate ranking changes across every suite before merging.
 - Document optional live scoring requirements and costs without making them a prerequisite for local use.
+
+## Future direction: agent-oriented core search
+
+Treat retrieval as a way to help an agent decide what to read before it edits
+code. The core search tool should return useful, ranked file leads with enough
+evidence for an agent to inspect them. Results are evidence-backed leads; a
+confidence-gate decision does not claim that a result is verified correct.
+
+The three-query repo-native context-pack pilot did not establish a coverage
+gain and increased the inspected-file proxy on one task. Keep that presentation
+experiment isolated while improving the core search workflow.
+
+### 6. Benchmark real inspection tasks
+
+Measure whether search helps an agent find the files it needs for realistic
+repository questions and change requests.
+
+- Add task-shaped queries such as “I need to change X; what should I inspect
+  first?” across repositories and languages already represented in the project.
+- Label relevant files by role where useful: implementation, test, configuration,
+  caller, or documentation. Record reviewed relevance judgments so unlabelled
+  results are not automatically treated as incorrect.
+- Keep a held-out set for evaluating ranking changes. Compare the current search
+  workflow with the existing baseline and, where practical, a simple `rg` workflow.
+- Report top-k coverage, ranking quality, inspected-file count, excerpt/context
+  size, latency, and optional API cost. Choose numeric targets after establishing
+  this reviewed baseline.
+
+**Exit evidence:** A reproducible benchmark report with reviewed judgments,
+representative held-out tasks, and a clear account of when retrieval saves agent
+inspection effort and when it does not.
+
+### 7. Make ranking evidence visible
+
+Give an agent enough information to judge why a file was returned and navigate
+to the relevant code without implying that the score proves correctness.
+
+- Return line-ranged excerpts tied to source locations.
+- Keep accepted results separate from lower-confidence candidates, including
+  each candidate's gate decision and supporting excerpt. ✅
+- Explain contributing signals, such as path terms, content terms, phrases,
+  definitions, and docstrings; keep the total score and gate decision separate
+  from this evidence.
+- Include scorer/provider and relevant configuration or version metadata so a
+  result can be interpreted and reproduced.
+- Keep an honest empty outcome when there is no positive retrieval signal.
+
+**Exit evidence:** For every returned result, an agent can inspect the source
+span and see the evidence behind its ranking. Repeated searches with the same
+repository, scorer version, and configuration produce the same local ranking.
+
+### 8. Improve core retrieval against observed failures
+
+Improve the local ranking based on measured misses and false accepts from
+realistic investigation tasks.
+
+- Check whether task-style query wording dilutes useful technical terms.
+- Improve symbol, path, definition, test, configuration, and caller signals
+  only where reviewed misses show a need.
+- Compare precision, coverage, and files inspected before and after each change.
+- Keep the scorer local and deterministic; require evidence before adding
+  persistent indexing or new retrieval dependencies.
+
+**Exit evidence:** Changes improve held-out task coverage or reduce inspected
+files without an unexplained precision regression.
+
+### 9. Make agent adoption straightforward
+
+Keep the same core search behavior available to people and agent runtimes.
+
+- Document one quick path from installation to a local code search with
+  no API key or external service.
+- Keep CLI, library, MCP, and skill instructions aligned with the same result
+  fields and uncertainty semantics.
+- Provide concise setup and example prompts for supported agent integrations,
+  including the correct skill discovery location for each platform.
+- Make optional external scoring explicit and report when it was used.
+
+**Exit evidence:** A new user can install the tool, run a local search, and
+understand its result format without configuring remote services. Agent
+integrations produce equivalent core results for the same query and options.
+
+### 10. Evaluate advanced retrieval only against observed gaps
+
+Treat embeddings, incremental indexes, broader AST support, and graph-based
+signals as experiments rather than prerequisites for the core workflow.
+
+- Select one retrieval improvement at a time based on failures in the reviewed
+  benchmark.
+- Compare quality, latency, resource use, setup cost, and operational complexity
+  with the local baseline.
+- Add persistent indexing only if measured repository sizes or search latency
+  justify its maintenance and cache-invalidation costs.
+- Keep all additional retrieval paths optional until they demonstrate a clear
+  benefit for the target workflow.
+
+**Exit evidence:** Each advanced component has a benchmarked improvement on
+known failure cases, no unexplained regression on held-out tasks, and documented
+costs and setup requirements.

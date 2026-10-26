@@ -37,6 +37,7 @@ packages = ["reflex_search"]
 
 [tool.ruff.lint.per-file-ignores]
 "tools/bench.py" = ["E402"]
+"tools/precision_analysis.py" = ["E402"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

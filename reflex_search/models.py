@@ -25,6 +25,18 @@ class SearchResult:
 
 
 @dataclass
+class SearchCandidate:
+    """Ranked lead that did not pass the accept threshold."""
+
+    path: str
+    score: float
+    provider: str
+    decision: str
+    reason: str
+    excerpt: str = ""
+
+
+@dataclass
 class SessionTelemetry:
     """Aggregate telemetry for a search session."""
 
@@ -40,11 +52,14 @@ class SessionTelemetry:
 
 @dataclass
 class SearchSession:
+    """Accepted results, lower-confidence candidates, and search audit data."""
+
     query: str
     repo_root: str
     results: list[SearchResult] = field(default_factory=list)
     audit_trail: list[dict[str, Any]] = field(default_factory=list)
     telemetry: SessionTelemetry | None = None
+    candidates: list[SearchCandidate] = field(default_factory=list)
 
 
 @runtime_checkable
@@ -57,6 +72,7 @@ class Scorer(Protocol):
 __all__ = [
     "GateDecision",
     "Scorer",
+    "SearchCandidate",
     "SearchResult",
     "SearchSession",
     "SessionTelemetry",

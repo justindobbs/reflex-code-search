@@ -22,7 +22,7 @@ app = typer.Typer(help="Search repository files with a lightweight REFLEX-style 
 def search(
     query: str = typer.Argument(..., help="Natural-language question to answer with file discovery."),
     repo_root: str = typer.Argument(".", help="Repository root to search."),
-    top_k: int = typer.Option(5, "--top-k", help="Maximum number of files to return."),
+    top_k: int = typer.Option(5, "--top-k", help="Maximum accepted results and candidate leads per list."),
     threshold: float = typer.Option(0.65, "--threshold", help="Accept threshold for the confidence gate."),
     uncertain: float = typer.Option(0.40, "--uncertain", help="Uncertain threshold below which candidates are rejected."),
     min_margin: float = typer.Option(0.0, "--min-margin", help="Minimum score margin for accept (ported from tracecore-reflex)."),
@@ -116,6 +116,17 @@ def search(
                 }
                 for r in session.results
             ],
+            "candidates": [
+                {
+                    "path": c.path,
+                    "score": c.score,
+                    "provider": c.provider,
+                    "decision": c.decision,
+                    "reason": c.reason,
+                    "excerpt": c.excerpt,
+                }
+                for c in session.candidates
+            ],
             "audit_trail": session.audit_trail,
             "telemetry": asdict(session.telemetry) if session.telemetry else None,
         }
@@ -128,14 +139,24 @@ def search(
 
     if not session.results:
         typer.echo("No strongly relevant files found.")
-        raise typer.Exit()
-
-    for result in session.results:
-        typer.echo(f"[{result.provider}] {result.score:.2f}  {result.path}")
-        typer.echo(f"  reason: {result.reason}")
-        if result.excerpt:
-            typer.echo(f"  excerpt: {result.excerpt[:180]}")
-        typer.echo("")
+        if session.candidates:
+            typer.echo("Closest candidates (not accepted by the confidence gate):")
+            for candidate in session.candidates:
+                typer.echo(
+                    f"[{candidate.decision}] [{candidate.provider}] "
+                    f"{candidate.score:.2f}  {candidate.path}"
+                )
+                typer.echo(f"  reason: {candidate.reason}")
+                if candidate.excerpt:
+                    typer.echo(f"  excerpt: {candidate.excerpt[:180]}")
+                typer.echo("")
+    else:
+        for result in session.results:
+            typer.echo(f"[{result.provider}] {result.score:.2f}  {result.path}")
+            typer.echo(f"  reason: {result.reason}")
+            if result.excerpt:
+                typer.echo(f"  excerpt: {result.excerpt[:180]}")
+            typer.echo("")
 
     if verbose and session.audit_trail:
         typer.echo("--- Audit Trail ---")

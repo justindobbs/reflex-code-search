@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f4f4ef">
-  <meta name="description" content="Ask a code question. Get the files that matter, ranked with an inspectable trail. Local-first semantic code search for Python.">
+  <meta name="description" content="Ask a code question. Get the files that matter, ranked with an inspectable trail. Local-first semantic code search with AST understanding, async scoring, and agent integration.">
   <meta property="og:title" content="REFLEX — Find the files behind the answer">
   <meta property="og:description" content="Local-first semantic code search with explainable results.">
   <meta property="og:type" content="website">
@@ -219,12 +219,12 @@
         <div>
           <p class="eyebrow">A better first step through a codebase</p>
           <h1>Find the files <span>behind</span> the answer.</h1>
-          <p class="hero-copy">Ask a question in plain language. REFLEX finds and ranks the files that can answer it, then shows why each one made the list.</p>
+          <p class="hero-copy">Ask a question in plain language. REFLEX finds and ranks the files that can answer it, then shows why each one made the list. Integrate via CLI, Python API, Agent Skills, or MCP.</p>
           <div class="actions">
             <a class="button" href="#quickstart">Try it locally <span class="arrow" aria-hidden="true">→</span></a>
             <a class="button light" href="https://github.com/justindobbs/reflex-code-search">Explore the source</a>
           </div>
-          <p class="hero-meta"><span>Python 3.11+</span><span>Runs locally</span><span>MIT licensed</span></p>
+          <p class="hero-meta"><span>Python 3.11+</span><span>Runs locally</span><span>Async scoring</span><span>MCP + Agent Skills</span><span>MIT licensed</span></p>
         </div>
         <div class="demo-wrap">
           <div class="demo" role="img" aria-label="Example search question with ranked code files and confidence decisions">
@@ -248,8 +248,8 @@
       <div class="trust-row wrap">
         <div class="trust-item"><span class="trust-icon">01</span><span><strong>Local first</strong><small>Search without credentials</small></span></div>
         <div class="trust-item"><span class="trust-icon">02</span><span><strong>Explainable</strong><small>Inspect the ranking trail</small></span></div>
-        <div class="trust-item"><span class="trust-icon">03</span><span><strong>Lightweight</strong><small>CLI and Python API</small></span></div>
-        <div class="trust-item"><span class="trust-icon">04</span><span><strong>Measured</strong><small>Reproducible benchmarks</small></span></div>
+        <div class="trust-item"><span class="trust-icon">03</span><span><strong>AST-aware</strong><small>Python definitions &amp; docstrings</small></span></div>
+        <div class="trust-item"><span class="trust-icon">04</span><span><strong>Agent-ready</strong><small>MCP server &amp; Agent Skills</small></span></div>
       </div>
     </div>
 
@@ -262,7 +262,7 @@
         </div>
         <div class="workflow">
           <article class="work-card"><div class="work-index"><span>01 / DISCOVER</span><span>→</span></div><h3>Collect the code</h3><p>Walk the repository, respect nested .gitignore rules, and skip generated and binary files.</p></article>
-          <article class="work-card"><div class="work-index"><span>02 / SCORE</span><span>→</span></div><h3>Rank likely matches</h3><p>Combine term, phrase, definition, and docstring signals to find files related to your question.</p></article>
+          <article class="work-card"><div class="work-index"><span>02 / SCORE</span><span>→</span></div><h3>Rank likely matches</h3><p>Combine term, phrase, AST-extracted definitions, and docstring signals to find files related to your question.</p></article>
           <article class="work-card"><div class="work-index"><span>03 / GATE</span><span>→</span></div><h3>Make decisions visible</h3><p>Accept, reject, or flag uncertain results with a configurable confidence gate.</p></article>
           <article class="work-card"><div class="work-index"><span>04 / INSPECT</span><span>✓</span></div><h3>Follow the evidence</h3><p>Review candidate scores and session telemetry. Add optional Jev scoring when useful.</p></article>
         </div>
@@ -277,9 +277,10 @@
           <p>Start at the command line. Bring the same search loop into your own Python workflow when you need it.</p>
         </div>
         <div class="feature-grid">
-          <article class="feature-card"><span class="feature-kicker">Local / 01</span><h3>Useful offline from the first run</h3><p>Local relevance scoring needs no service, account, or API key. Point it at a repository and start asking questions.</p><span class="feature-aside">ZERO CONFIG</span></article>
-          <article class="feature-card"><span class="feature-kicker">Control / 02</span><h3>Choose when to call a model</h3><p>Use optional Jev scoring for live results or as a fallback for uncertain candidates when you configure it.</p><span class="feature-aside">OPT IN</span></article>
-          <article class="feature-card wide"><span class="feature-kicker">Integrate / 03</span><h3>Keep the results in your workflow</h3><p>Use the CLI, consume structured JSON, call the Python API, or provide a custom scorer through a small protocol.</p><span class="feature-aside">CLI + PYTHON API</span></article>
+          <article class="feature-card"><span class="feature-kicker">Local / 01</span><h3>AST-aware Python understanding</h3><p>Extracts class names, function signatures, docstrings, and imports using the stdlib ast module. Non-Python files fall back to regex heuristics.</p><span class="feature-aside">ZERO DEPS</span></article>
+          <article class="feature-card"><span class="feature-kicker">Control / 02</span><h3>Sync or async, your choice</h3><p>Run locally in milliseconds, or score in parallel with AsyncJevScorer and configurable concurrency. The --async flag enables parallel Jev calls for live and smart-fallback modes.</p><span class="feature-aside">ASYNCIO</span></article>
+          <article class="feature-card"><span class="feature-kicker">Integrate / 03</span><h3>Built for agents</h3><p>Expose search as an MCP tool for AI agents, or use the zero-dependency Agent Skills file. Compatible with Windsurf, Claude Code, and any MCP host.</p><span class="feature-aside">MCP + SKILLS</span></article>
+          <article class="feature-card"><span class="feature-kicker">Extend / 04</span><h3>Keep the results in your workflow</h3><p>Use the CLI, consume structured JSON, call the Python API, or provide a custom scorer through a small protocol.</p><span class="feature-aside">CLI + PYTHON API</span></article>
         </div>
       </div>
     </section>
@@ -289,10 +290,10 @@
         <div class="section-head">
           <p class="eyebrow">A measured snapshot</p>
           <h2>Fast local results on a real codebase.</h2>
-          <p>Current checked-in benchmark results for reflex-code-search using 28 labeled questions.</p>
+          <p>Current checked-in benchmark results across 60 labeled questions and 4 repositories (reflex-code-search, tracecore-reflex, Click, httpx).</p>
         </div>
         <div class="bench-layout">
-          <article class="bench-lead"><div><span class="bench-lead-label">RECALL@5 / LOCAL</span><div class="bench-big">98%</div><p>Relevant files found among the first five results across the project query set.</p></div><span class="bench-lead-label">28 QUERIES · THRESHOLD 0.3</span></article>
+          <article class="bench-lead"><div><span class="bench-lead-label">RECALL@5 / LOCAL</span><div class="bench-big">98%</div><p>Relevant files found among the first five results on the reflex-code-search query set.</p></div><span class="bench-lead-label">60 QUERIES · 4 REPOS · THRESHOLD 0.3</span></article>
           <div class="bench-stats">
             <article class="bench-stat"><strong>AVG. LATENCY</strong><b>45 ms</b><span>Local benchmark average</span></article>
             <article class="bench-stat"><strong>AVG. PRECISION@5</strong><b>29%</b><span>Across labeled queries</span></article>
@@ -320,8 +321,11 @@ python -m pip install -e .
 <span class="code-comment"># Search this codebase</span>
 reflex-search "Where are API errors handled?" .
 
-<span class="code-comment"># Get structured results</span>
-reflex-search "How does file collection work?" . --json</code></pre>
+<span class="code-comment"># Async two-pass with Jev API</span>
+reflex-search "How does scoring work?" . --live --async
+
+<span class="code-comment"># Run as an MCP server for agents</span>
+pip install -e ".[mcp]" &amp;&amp; reflex-search-mcp</code></pre>
         </div>
       </div>
     </section>
